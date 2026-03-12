@@ -10,8 +10,20 @@ import java.util.Collections;
  */
 public class Controller {
 
-	//length of a working day in seconds
-	private static int workingDay = 100;   
+    //length of a working day in seconds
+    private static int workingDay = 100;   
+
+    // package-private setter so Parse can set working day after parsing
+    static void setWorkingDay(double seconds) {
+        if (seconds < 0) return;
+        // cast to int safely
+        workingDay = (int) Math.round(seconds);
+    }
+
+    // expose getter for printing
+    static int getWorkingDay() {
+        return workingDay;
+    }
 	
 	//number of time slices
 	private static int noTimeSlices = 50;  

@@ -55,7 +55,7 @@ public class Ants {
      * Germany
      ***************************************************************************/
 	
-    static class Ant {
+	 static class Ant {
     	//for each of the m salesmen an ant will construct a tour, so that a candidate solution constructed by
     	//an ant will be represented by a list of tours, one for each salesman
     	ArrayList<ArrayList<Integer>> tours;
@@ -87,8 +87,12 @@ public class Ants {
 		int indexLongestTour;  //the index of the longest tour
 		//cities left to be visited by an ant (initially toVisit = n, which is the number of cities from the mTSP instance)
 		int toVisit;
-		//stores the cost of each solution according to the considered objectives (2 in this case)
-		double costObjectives[];
+			//stores the cost of each solution according to the considered objectives (2 in this case)
+			double costObjectives[];
+			//number of requests that remained unvisited (treated as rejected)
+			int rejectedCount;
+			//list with ids of rejected requests (unvisited)
+			ArrayList<Integer> rejectedList;
 		//it is true if a new empty tour was added in the ant solution to service the remaining available
 		//unrouted/unvisited customers
 		boolean addedEmptyTour;
@@ -173,13 +177,15 @@ public class Ants {
 		    	ants[i].tour_lengths.add(j, 0.0);
 		    	//lastCommitted.add(j, 0); 
 		    }
-		    ants[i].visited = new boolean[VRPTW.n];
+			ants[i].visited = new boolean[VRPTW.n];
 			//the another node is the depot, which is by default visited by each salesman and added in its tour
-		    ants[i].toVisit = instance.getIdAvailableRequests().size();
-		    ants[i].costObjectives = new double[2];
-		    for (int indexObj = 0; indexObj < 2; indexObj++) {
-		    	ants[i].costObjectives[indexObj] = 0;
-	    	}
+			ants[i].toVisit = instance.getIdAvailableRequests().size();
+			ants[i].costObjectives = new double[2];
+			for (int indexObj = 0; indexObj < 2; indexObj++) {
+				ants[i].costObjectives[indexObj] = 0;
+			}
+			ants[i].rejectedCount = 0;
+			ants[i].rejectedList = new ArrayList<Integer>();
 		    ants[i].earliestTime = new ArrayList(ants[i].usedVehicles);
 		    ants[i].latestTime = new ArrayList(ants[i].usedVehicles);
 		}
@@ -202,9 +208,11 @@ public class Ants {
 		best_so_far_ant.longest_tour_length = Double.MAX_VALUE;
 		
 		best_so_far_ant.costObjectives = new double[2];
-	    for (int indexObj = 0; indexObj < 2; indexObj++) {
-	    	best_so_far_ant.costObjectives[indexObj] = 0;
-    	}
+		for (int indexObj = 0; indexObj < 2; indexObj++) {
+			best_so_far_ant.costObjectives[indexObj] = 0;
+		}
+		best_so_far_ant.rejectedCount = 0;
+		best_so_far_ant.rejectedList = new ArrayList<Integer>();
 	    best_so_far_ant.earliestTime = new ArrayList(best_so_far_ant.usedVehicles);
 	    best_so_far_ant.latestTime = new ArrayList(best_so_far_ant.usedVehicles);
 	    
@@ -225,10 +233,12 @@ public class Ants {
 	    restart_best_ant.toVisit = instance.getIdAvailableRequests().size();
 	    restart_best_ant.longest_tour_length = Double.MAX_VALUE;
 		
-	    restart_best_ant.costObjectives = new double[2];
-	    for (int indexObj = 0; indexObj < 2; indexObj++) {
-	    	restart_best_ant.costObjectives[indexObj] = 0;
-    	}
+		restart_best_ant.costObjectives = new double[2];
+		for (int indexObj = 0; indexObj < 2; indexObj++) {
+			restart_best_ant.costObjectives[indexObj] = 0;
+		}
+		restart_best_ant.rejectedCount = 0;
+		restart_best_ant.rejectedList = new ArrayList<Integer>();
 	    restart_best_ant.earliestTime = new ArrayList(restart_best_ant.usedVehicles);
 	    restart_best_ant.latestTime = new ArrayList(restart_best_ant.usedVehicles);
 	
@@ -248,30 +258,27 @@ public class Ants {
     //with smaller total traveled distance)
     static int find_best()
     {
-    	double min1, min2;
-		int k1, k2, k2_min;
-		
-		//first detect the ant which uses the minimum number of vehicles
-		min1 = ants[0].usedVehicles;
-		for (k1 = 1; k1 < n_ants; k1++) {
-		    if (ants[k1].usedVehicles < min1) {
-				min1 = ants[k1].usedVehicles;
-		    }
-		}
-		
-	    //among the vehicles which use the minimum number of vehicles, select the best ant as the one with the minimum total distance for its traveled tours
-		min2 = Double.MAX_VALUE;
-		k2_min = 0;
-		for (k2 = 0; k2 < n_ants; k2++) {
-			if (ants[k2].usedVehicles == min1) {
-				if (ants[k2].total_tour_length < min2) {
-					min2 = ants[k2].total_tour_length;
-					k2_min = k2;
-			    }
-			}
-		    
-		}
-		return k2_min;
+        double bestScore = Double.POSITIVE_INFINITY;
+        int bestIndex = 0;
+        for (int k = 0; k < n_ants; k++) {
+            double score = InOut.costWeight * ants[k].total_tour_length + InOut.rejectWeight * (double) ants[k].rejectedCount;
+            if (Double.isNaN(score)) {
+                score = Double.POSITIVE_INFINITY;
+            }
+            if (score < bestScore) {
+                bestScore = score;
+                bestIndex = k;
+            } else if (score == bestScore) {
+                // tie-breaker: prefer solution with fewer vehicles, then smaller total length
+                if (ants[k].usedVehicles < ants[bestIndex].usedVehicles) {
+                    bestIndex = k;
+                } else if (ants[k].usedVehicles == ants[bestIndex].usedVehicles
+                        && ants[k].total_tour_length < ants[bestIndex].total_tour_length) {
+                    bestIndex = k;
+                }
+            }
+        }
+        return bestIndex;
     }
 
     //initialize pheromone trails
@@ -328,7 +335,13 @@ public class Ants {
 		int i, j, h, k, size;
 		double d_tau;
 	
-		d_tau = 1.0 / (double) a.total_tour_length;
+        // use weighted objective for pheromone quantity: costWeight * length + rejectWeight * rejectedCount
+        double weightedScore = InOut.costWeight * a.total_tour_length + InOut.rejectWeight * (double) a.rejectedCount;
+        if (weightedScore <= 0.0) {
+            d_tau = 0.0;
+        } else {
+            d_tau = 1.0 / weightedScore;
+        }
 		for (i = 0; i < a.usedVehicles; i++) {
 			size = a.tours.get(i).size();
 			for (k = 0; k < size - 1; k++) {
@@ -369,8 +382,13 @@ public class Ants {
 		a.addedEmptyTour = false;
 		
 		for (int indexObj = 0; indexObj < 2; indexObj++) {
-	    	a.costObjectives[indexObj] = 0;
-	    }
+			a.costObjectives[indexObj] = 0;
+		}
+		//reset rejection tracking
+		a.rejectedCount = 0;
+		if (a.rejectedList != null) {
+			a.rejectedList.clear();
+		}
 		
 		 a.tour_lengths.clear();
 		 a.currentQuantity.clear();
@@ -431,7 +449,14 @@ public class Ants {
 	    copy.visited = new boolean[VRPTW.n];
 	    copy.toVisit = VRPTW.n;
 	    
-	    copy.costObjectives = new double[2];
+    	copy.costObjectives = new double[2];
+		copy.rejectedCount = a.rejectedCount;
+		copy.rejectedList = new ArrayList<Integer>();
+		if (a.rejectedList != null) {
+			for (Integer id : a.rejectedList) {
+				copy.rejectedList.add(id);
+			}
+		}
 	    //copy.weights = new double[TSP_ACO.k];
     	
 	    //then copy the information from the ant a
@@ -1068,8 +1093,14 @@ public class Ants {
     static void global_acs_pheromone_update(Ant a) {
 		int i, j, h, k, size;
 		double d_tau;
-	
-		d_tau = 1.0 / (double) a.total_tour_length;
+    
+    		// use weighted objective for pheromone quantity: costWeight * length + rejectWeight * rejectedCount
+    		double weightedScore = InOut.costWeight * a.total_tour_length + InOut.rejectWeight * (double) a.rejectedCount;
+    		if (weightedScore <= 0.0) {
+    			d_tau = 0.0;
+    		} else {
+    			d_tau = 1.0 / weightedScore;
+    		}
 		//d_tau = 1.0 / ((double) a.total_tour_length * (double) a.usedVehicles);
 		//d_tau = 1.0 / ((double) a.total_tour_length * (double) a.usedVehicles * 0.1);
 		//d_tau = 1.0 / ((double) a.total_tour_length + (double) a.usedVehicles * 0.01);
@@ -1126,7 +1157,15 @@ public class Ants {
 	
 		for (int indexObj = 0; indexObj < 2; indexObj++) {
 		   a2.costObjectives[indexObj] = a1.costObjectives[indexObj];
-    	}
+	 	}
+		//copy rejection info
+		a2.rejectedCount = a1.rejectedCount;
+		a2.rejectedList = new ArrayList<Integer>();
+		if (a1.rejectedList != null) {
+			for (Integer id : a1.rejectedList) {
+				a2.rejectedList.add(id);
+			}
+		}
 		
 		if (a2.usedVehicles < a1.usedVehicles) {
 			for (int index = a2.usedVehicles; index < a1.usedVehicles; index++) {

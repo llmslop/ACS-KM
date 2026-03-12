@@ -317,6 +317,16 @@ public class VRPTW_ACS implements Runnable {
 			//Ants.ants[k].total_tour_length = Tsp.compute_tour_lengths(Ants.ants[k].tours);
 			Ants.ants[k].costObjectives[0] = Ants.ants[k].total_tour_length;
 			Ants.ants[k].costObjectives[1] = Ants.computeToursAmplitude(Ants.ants[k]);
+			// compute rejected requests (those known but not visited)
+			ArrayList<Integer> idKnown = instance.getIdAvailableRequests();
+			ArrayList<Integer> rejected = new ArrayList<Integer>();
+			for (int id : idKnown) {
+				if (!Ants.ants[k].visited[id]) {
+					rejected.add(id);
+				}
+			}
+			Ants.ants[k].rejectedList = rejected;
+			Ants.ants[k].rejectedCount = rejected.size();
 		}
 		InOut.n_tours += (Ants.n_ants * Ants.ants[0].usedVehicles); //each ant constructs a complete and closed tour
     }
@@ -1447,19 +1457,26 @@ public class VRPTW_ACS implements Runnable {
         	
 		}
 		
-		synchronized (obj) {
-			round1 = Math.round(a.total_tour_length * tempNo) / tempNo;
-			round2 = Math.round(Ants.best_so_far_ant.total_tour_length * tempNo) / tempNo;
-			if ((a.usedVehicles < Ants.best_so_far_ant.usedVehicles) || ((a.usedVehicles == Ants.best_so_far_ant.usedVehicles) && (round1 < round2))
-				|| ((round1 < round2) && (Ants.best_so_far_ant.total_tour_length == Double.MAX_VALUE))) {
+		 synchronized (obj) {
+				// use weighted objective when deciding to update best-so-far
+				double weightedA = InOut.costWeight * a.total_tour_length + InOut.rejectWeight * (double) a.rejectedCount;
+				double weightedBest = InOut.costWeight * Ants.best_so_far_ant.total_tour_length + InOut.rejectWeight * (double) Ants.best_so_far_ant.rejectedCount;
+				boolean better = false;
+				if (Double.isNaN(weightedA)) weightedA = Double.POSITIVE_INFINITY;
+				if (Double.isNaN(weightedBest)) weightedBest = Double.POSITIVE_INFINITY;
+				if (weightedA < weightedBest) {
+					better = true;
+				} else if (weightedA == weightedBest) {
+					// tie-breaker: prefer fewer used vehicles, then smaller total tour length
+					if (a.usedVehicles < Ants.best_so_far_ant.usedVehicles)
+						better = true;
+					else if (a.usedVehicles == Ants.best_so_far_ant.usedVehicles && a.total_tour_length < Ants.best_so_far_ant.total_tour_length)
+						better = true;
+				}
+				if (better || Ants.best_so_far_ant.total_tour_length == Double.MAX_VALUE) {
 			
-			    InOut.time_used = Timer.elapsed_time();  //best solution found after time_used 
-			    /*if (a.usedVehicles < Ants.best_so_far_ant.usedVehicles) {
-			    	for (int i = a.usedVehicles; i < Ants.best_so_far_ant.usedVehicles; i++) {
-			    		Ants.lastCommitted.remove(a.usedVehicles);
-			    	}
-			    }*/
-			    Ants.copy_from_to(a, Ants.best_so_far_ant, instance);
+					InOut.time_used = Timer.elapsed_time();  //best solution found after time_used 
+					Ants.copy_from_to(a, Ants.best_so_far_ant, instance);
 	    
 			    scalingValue = Controller.getScalingValue();
 				if (scalingValue != 0) {
@@ -1542,27 +1559,36 @@ public class VRPTW_ACS implements Runnable {
 			a.indexLongestTour = idLongestTour;
 		}*/
 		
-		if ((a.usedVehicles < Ants.best_so_far_ant.usedVehicles) || (a.usedVehicles == Ants.best_so_far_ant.usedVehicles) && (a.total_tour_length < Ants.best_so_far_ant.total_tour_length)
-				|| ((a.total_tour_length < Ants.best_so_far_ant.total_tour_length) && (Ants.best_so_far_ant.total_tour_length == Double.MAX_VALUE))) {
-			
-		    InOut.time_used = Timer.elapsed_time();  //best solution found after time_used 
-		    Ants.copy_from_to(a, Ants.best_so_far_ant, instance);
-		    Ants.copy_from_to(a, Ants.restart_best_ant, instance);
-	
-		    InOut.found_best = InOut.iteration;	 
-		    InOut.restart_found_best = InOut.iteration;
-		    //InOut.branching_factor = InOut.node_branching(InOut.lambda);
-		    //System.out.println("Iter: " + InOut.iteration + " Best ant -> longest tour=" + Ants.best_so_far_ant.longest_tour_length + ", b_fac " + InOut.branching_factor);
-		    //System.out.println("Iter: " + InOut.iteration + " Best ant -> longest tour=" + Ants.best_so_far_ant.longest_tour_length);
-		    //System.out.println("Iter: " + InOut.iteration + " Best ant >> No. of used vehicles=" + Ants.best_so_far_ant.usedVehicles + " total tours length=" + Ants.best_so_far_ant.total_tour_length);
+		// decide based on weighted objective (costWeight * length + rejectWeight * rejectedCount)
+		double weightedA = InOut.costWeight * a.total_tour_length + InOut.rejectWeight * (double) a.rejectedCount;
+		double weightedBest = InOut.costWeight * Ants.best_so_far_ant.total_tour_length + InOut.rejectWeight * (double) Ants.best_so_far_ant.rejectedCount;
+		if (Double.isNaN(weightedA)) weightedA = Double.POSITIVE_INFINITY;
+		if (Double.isNaN(weightedBest)) weightedBest = Double.POSITIVE_INFINITY;
+		boolean betterBest = false;
+		if (weightedA < weightedBest) betterBest = true;
+		else if (weightedA == weightedBest) {
+			if (a.usedVehicles < Ants.best_so_far_ant.usedVehicles) betterBest = true;
+			else if (a.usedVehicles == Ants.best_so_far_ant.usedVehicles && a.total_tour_length < Ants.best_so_far_ant.total_tour_length) betterBest = true;
 		}
-		
-		if ((a.usedVehicles < Ants.restart_best_ant.usedVehicles) || (a.usedVehicles == Ants.restart_best_ant.usedVehicles) && (a.total_tour_length < Ants.restart_best_ant.total_tour_length)
-				|| ((a.total_tour_length < Ants.restart_best_ant.total_tour_length) && (Ants.restart_best_ant.total_tour_length == Double.MAX_VALUE))) {
-		    Ants.copy_from_to(a, Ants.restart_best_ant, instance);
-		    
-		    InOut.restart_found_best = InOut.iteration;
-		    //System.out.println("Iter: " + InOut.iteration + " Restart best ant >> No. of used vehicles=" + Ants.restart_best_ant.usedVehicles + " total tours length=" + Ants.restart_best_ant.total_tour_length);
+		if (betterBest || Ants.best_so_far_ant.total_tour_length == Double.MAX_VALUE) {
+			InOut.time_used = Timer.elapsed_time();  //best solution found after time_used 
+			Ants.copy_from_to(a, Ants.best_so_far_ant, instance);
+			Ants.copy_from_to(a, Ants.restart_best_ant, instance);
+			InOut.found_best = InOut.iteration; 
+			InOut.restart_found_best = InOut.iteration;
+		}
+		// update restart_best_ant similarly
+		double weightedRestart = InOut.costWeight * Ants.restart_best_ant.total_tour_length + InOut.rejectWeight * (double) Ants.restart_best_ant.rejectedCount;
+		if (Double.isNaN(weightedRestart)) weightedRestart = Double.POSITIVE_INFINITY;
+		boolean betterRestart = false;
+		if (weightedA < weightedRestart) betterRestart = true;
+		else if (weightedA == weightedRestart) {
+			if (a.usedVehicles < Ants.restart_best_ant.usedVehicles) betterRestart = true;
+			else if (a.usedVehicles == Ants.restart_best_ant.usedVehicles && a.total_tour_length < Ants.restart_best_ant.total_tour_length) betterRestart = true;
+		}
+		if (betterRestart || Ants.restart_best_ant.total_tour_length == Double.MAX_VALUE) {
+			Ants.copy_from_to(a, Ants.restart_best_ant, instance);
+			InOut.restart_found_best = InOut.iteration;
 		}
 		
 		/*if (!saveIterCosts) {

@@ -79,6 +79,8 @@ public class InOut {
     public static int max_iterations; /* maximum number of iterations */
 
     static double max_time; /* maximal allowed run time of a try */
+    // parsed working day value (if provided via CLI) - Controller will read this
+    public static double parsedWorkingDay = -1.0;
     static double time_used; /* time used until some given event */
     static double time_passed; /* time passed until some moment */
     static int optimal; /* optimal solution or bound to find */
@@ -94,6 +96,9 @@ public class InOut {
     static int opt;
     
     static double pheromonePreservation;
+    // weights used to combine cost and rejected requests in the objective
+    public static double costWeight = 1.0;
+    public static double rejectWeight = 0.0;
     static int noEvaluations = 0;
     static int noSolutions = 0;   /* counter for the total number of feasible solutions */
 

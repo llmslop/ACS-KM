@@ -47,15 +47,21 @@ public class Parse {
 
 		Map<String, Integer> opt = new HashMap<String, Integer>();
 	
-		public OptComparator() {
-		    int i = 0;
-		    
-		    opt.put("u", i++);
-		    opt.put("z", i++);
-		    
-		    //add
-		    opt.put("l", i++);
-		}
+        public OptComparator() {
+            int i = 0;
+            
+            opt.put("u", i++);
+            opt.put("z", i++);
+            
+            //add
+            opt.put("l", i++);
+            // weights options
+            opt.put("C", i++);
+            opt.put("R", i++);
+            // time options
+            opt.put("T", i++);
+            opt.put("W", i++);
+        }
 	
 		@Override
 		public int compare(Option o1, Option o2) {
@@ -72,12 +78,20 @@ public class Parse {
 		    System.exit(1);
 		}
 	
-		Options options = new Options();
-		options.addOption("u", "as", false, "apply basic Ant System");
-		options.addOption("z", "acs", false, "apply ant colony colony system");
-		
-		//add
-		options.addOption("l", "acs-km", false, "apply acs-km system");
+        Options options = new Options();
+        options.addOption("u", "as", false, "apply basic Ant System");
+        options.addOption("z", "acs", false, "apply ant colony colony system");
+        
+        //add
+        options.addOption("l", "acs-km", false, "apply acs-km system");
+
+        // time limit and working day
+        options.addOption("T", "time-limit", true, "max ACO run time in seconds (double, >= 0)");
+        options.addOption("W", "working-day", true, "working day length in seconds (double, >= 0)");
+
+		// weights for the combined objective (default: costWeight=1.0, rejectWeight=0.0)
+		options.addOption("C", "cost-weight", true, "weight for route cost (double, >= 0)");
+		options.addOption("R", "reject-weight", true, "weight for rejected requests (double, >= 0)");
 	
 		CommandLine cmd = null;
 		CommandLineParser parser = new BasicParser();
@@ -109,18 +123,83 @@ public class Parse {
 		    Ants.acs_km_flag = false;
 		}
 	
-		if (cmd.hasOption("u")) {
-		    Ants.as_flag = true;
-		    InOut.set_default_as_parameters();
-		    System.out.println("\nRun basic Ant System #" + (runNumber + 1));
+        if (cmd.hasOption("u")) {
+            Ants.as_flag = true;
+            InOut.set_default_as_parameters();
+            System.out.println("\nRun basic Ant System #" + (runNumber + 1));
+        }
+        if (cmd.hasOption("z")||cmd.hasOption("l")) {
+            Ants.acs_flag = true;
+            InOut.set_default_acs_parameters();
+            System.out.println("\nRun Ant Colony System #" + (runNumber + 1));
+        }
+        if(cmd.hasOption("l")) {
+            Ants.acs_km_flag = true;
+        }
+
+        // parse optional time limits
+        if (cmd.hasOption("T")) {
+            String val = cmd.getOptionValue("T");
+            try {
+                double t = Double.parseDouble(val);
+                if (t < 0.0) {
+                    System.err.println("Error: time-limit must be non-negative.");
+                    System.exit(1);
+                }
+                InOut.max_time = t;
+            } catch (NumberFormatException e) {
+                System.err.println("Error: time-limit must be a number.");
+                System.exit(1);
+            }
+        }
+        if (cmd.hasOption("W")) {
+            String val = cmd.getOptionValue("W");
+            try {
+                double w = Double.parseDouble(val);
+                if (w < 0.0) {
+                    System.err.println("Error: working-day must be non-negative.");
+                    System.exit(1);
+                }
+                // set Controller.workingDay via package-private setter
+                Controller.setWorkingDay(w);
+            } catch (NumberFormatException e) {
+                System.err.println("Error: working-day must be a number.");
+                System.exit(1);
+            }
+        }
+		// parse optional objective weights
+		if (cmd.hasOption("C")) {
+			String val = cmd.getOptionValue("C");
+			try {
+				double cw = Double.parseDouble(val);
+				if (cw < 0.0) {
+					System.err.println("Error: cost-weight must be non-negative.");
+					System.exit(1);
+				}
+				InOut.costWeight = cw;
+			} catch (NumberFormatException e) {
+				System.err.println("Error: cost-weight must be a number.");
+				System.exit(1);
+			}
 		}
-		if (cmd.hasOption("z")||cmd.hasOption("l")) {
-		    Ants.acs_flag = true;
-		    InOut.set_default_acs_parameters();
-		    System.out.println("\nRun Ant Colony System #" + (runNumber + 1));
+		if (cmd.hasOption("R")) {
+			String val = cmd.getOptionValue("R");
+			try {
+				double rw = Double.parseDouble(val);
+				if (rw < 0.0) {
+					System.err.println("Error: reject-weight must be non-negative.");
+					System.exit(1);
+				}
+				InOut.rejectWeight = rw;
+			} catch (NumberFormatException e) {
+				System.err.println("Error: reject-weight must be a number.");
+				System.exit(1);
+			}
 		}
-		if(cmd.hasOption("l")) {
-			Ants.acs_km_flag = true;
-		}
+        System.out.println("Objective weights: costWeight=" + InOut.costWeight + ", rejectWeight=" + InOut.rejectWeight);
+        // print time limits banner
+        double mt = InOut.max_time;
+        int wd = Controller.getWorkingDay();
+        System.out.println("Time limits: max_time=" + mt + ", working_day=" + wd);
     }
 }

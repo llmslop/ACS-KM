@@ -823,6 +823,14 @@ public class Utilities {
 			}   
 			bw.write("\nTotal number of evaluations: " + InOut.noEvaluations);
 			bw.write("\nAdded nodes=" + Controller.addedNodes); 
+			// report rejected requests in the final solution (if any)
+			bw.write("\nRejected requests (count): " + Ants.best_so_far_ant.rejectedCount);
+			if (Ants.best_so_far_ant.rejectedCount > 0) {
+				bw.write(" -> ");
+				for (int i = 0; i < Ants.best_so_far_ant.rejectedList.size(); i++) {
+					bw.write((Ants.best_so_far_ant.rejectedList.get(i) + 1) + (i < Ants.best_so_far_ant.rejectedList.size() - 1 ? ", " : ""));
+				}
+			}
 		    if (isValid) {
 		    	bw.write("\nThe final solution is valid (feasible)..");
 		    }
