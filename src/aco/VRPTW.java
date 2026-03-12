@@ -352,15 +352,22 @@ public class VRPTW {
     static double compute_tour_length_(ArrayList<Integer> t) {
         int i;
 		double sum = 0;
-	
+
+		// Tours may contain intermediate depot markers (-1) representing a vehicle
+		// returning to the depot mid-route to reset capacity (multi-trip).
+		// Each entry that is -1 maps to the depot (distance-matrix index 0).
+		// We iterate over consecutive pairs and resolve -1 -> 0 before looking up
+		// the distance so that depot returns are properly accounted for.
 		if (t.size() > 1) {
-			sum += VRPTW.instance.distance[0][t.get(1) + 1];
-			for (i = 1; i < t.size() - 2; i++) {
-				sum += VRPTW.instance.distance[t.get(i) + 1][t.get(i + 1) + 1];
+			for (i = 0; i < t.size() - 1; i++) {
+				int from = (t.get(i) == -1) ? -1 : t.get(i);
+				int to   = (t.get(i + 1) == -1) ? -1 : t.get(i + 1);
+				int fromIdx = (from == -1) ? 0 : from + 1;
+				int toIdx   = (to   == -1) ? 0 : to   + 1;
+				sum += VRPTW.instance.distance[fromIdx][toIdx];
 			}
-			sum += VRPTW.instance.distance[t.get(t.size() - 2) + 1][0];
-		}		
-		
+		}
+
 		return sum;
     }
     

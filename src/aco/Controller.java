@@ -87,6 +87,7 @@ public class Controller {
     		tourLength = Ants.best_so_far_ant.tours.get(indexTour).size();
 	    	for (int i = 1; i < tourLength - 1; i++) {
 	    		node = Ants.best_so_far_ant.tours.get(indexTour).get(i);
+	    		if (node == -1) break; // treat depot-return marker as end of committable prefix
 	    		if (Ants.committedNodes[node]) {
 	    			pos++;
 	    		}
@@ -113,20 +114,21 @@ public class Controller {
     		
     		//skip for already committed nodes
     		tourLength = bestAnt.tours.get(indexTour).size();
-    		startPos = getLastCommitedPos(indexTour);
-    		for (int i = startPos + 1; i < tourLength - 1; i++) {
-    			node = bestAnt.tours.get(indexTour).get(i);
-    			//check condition for a node to be committed
-    			if (bestAnt.beginService[node + 1] <= indexTimeSlice * lengthTimeSlice) {
-    				if (!Ants.committedNodes[node]) {
-    					return true;
-    				}
-    				else {
-    					continue;
-    				}
+    	startPos = getLastCommitedPos(indexTour);
+    	for (int i = startPos + 1; i < tourLength - 1; i++) {
+    		node = bestAnt.tours.get(indexTour).get(i);
+    		if (node == -1) continue; // skip depot-return markers
+    		//check condition for a node to be committed
+    		if (bestAnt.beginService[node + 1] <= indexTimeSlice * lengthTimeSlice) {
+    			if (!Ants.committedNodes[node]) {
+    				return true;
     			}
     			else {
-    				indexTour++;
+    				continue;
+    			}
+    		}
+    		else {
+    			indexTour++;
     				break;
     			}
     		}
@@ -135,7 +137,12 @@ public class Controller {
     		if (indexTour < bestAnt.usedVehicles) {
     			startPos = getLastCommitedPos(indexTour);
     			tourLength = bestAnt.tours.get(indexTour).size();
-    			if (startPos == tourLength - 2) {
+    			// Count real customer nodes in this tour (exclude -1 depot markers)
+    			int realNodes = 0;
+    			for (int k = 1; k < tourLength - 1; k++) {
+    				if (bestAnt.tours.get(indexTour).get(k) != -1) realNodes++;
+    			}
+	    		if (startPos >= realNodes) {
 	    			indexTour++;
 	    		}
     		}
@@ -163,26 +170,32 @@ public class Controller {
     		if (count >= 50) {
     			System.out.println("Index tour=" + indexTour + ", used vehicles=" + bestAnt.usedVehicles + ", tour length=" + tourLength);
     		}
-    		startPos = getLastCommitedPos(indexTour);
-    		for (int i = startPos + 1; i < tourLength - 1; i++) {
-    			node = bestAnt.tours.get(indexTour).get(i);
-    			//check condition for a node to be committed
-    			if ((bestAnt.beginService[node + 1] <= indexTimeSlice * lengthTimeSlice) &&
-    			    (!Ants.committedNodes[node])) {
-    					Ants.committedNodes[node] = true;
-    					//Ants.lastCommitted.set(indexTour, i);
-    			}
-    			else {
-    				indexTour++;
-    				break;
-    			}
+    	startPos = getLastCommitedPos(indexTour);
+    	for (int i = startPos + 1; i < tourLength - 1; i++) {
+    		node = bestAnt.tours.get(indexTour).get(i);
+    		if (node == -1) continue; // skip depot-return markers
+    		//check condition for a node to be committed
+    		if ((bestAnt.beginService[node + 1] <= indexTimeSlice * lengthTimeSlice) &&
+    		    (!Ants.committedNodes[node])) {
+    				Ants.committedNodes[node] = true;
+    				//Ants.lastCommitted.set(indexTour, i);
     		}
+    		else {
+    			indexTour++;
+    			break;
+    		}
+    	}
     		//if all the nodes from this tour were committed (the depot from the start and 
 			//end of a tour are assumed to be committed by default), move to the next tour
     		if (indexTour < bestAnt.usedVehicles) {
     			startPos = getLastCommitedPos(indexTour);
     			tourLength = bestAnt.tours.get(indexTour).size();
-	    		if (startPos == tourLength - 2) {
+    			// Count real customer nodes in this tour (exclude -1 depot markers)
+    			int realNodes = 0;
+    			for (int k = 1; k < tourLength - 1; k++) {
+    				if (bestAnt.tours.get(indexTour).get(k) != -1) realNodes++;
+    			}
+	    		if (startPos >= realNodes) {
 	    			indexTour++;
 	    		}
     		}

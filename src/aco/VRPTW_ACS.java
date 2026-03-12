@@ -398,6 +398,43 @@ public class VRPTW_ACS implements Runnable {
 		return a;
     }
     
+	/**
+	 * Compute the total demand loaded onto the vehicle within the trip that
+	 * contains position {@code pos} in the given tour.
+	 *
+	 * <p>A "trip" is the segment of customers between two consecutive depot
+	 * markers (-1).  When a tour has no intermediate depot markers (classic
+	 * single-trip), this returns the same value as the full-tour load.
+	 *
+	 * @param a          the ant solution
+	 * @param vrp        problem instance (for the request list)
+	 * @param tourIndex  which route/vehicle
+	 * @param pos        position inside the tour whose trip we want to measure
+	 * @return total demand in the trip containing {@code pos}
+	 */
+	static double computeTripLoad(Ant a, VRPTW vrp, int tourIndex, int pos) {
+		ArrayList<Integer> tour = a.tours.get(tourIndex);
+		ArrayList<Request> reqList = vrp.getRequests();
+		// Walk backwards to find the start of the current trip
+		int start = pos;
+		while (start > 0 && tour.get(start - 1) != -1) {
+			start--;
+		}
+		// Walk forwards to find the end of the current trip
+		int end = pos;
+		while (end < tour.size() - 1 && tour.get(end + 1) != -1) {
+			end++;
+		}
+		double load = 0.0;
+		for (int k = start; k <= end; k++) {
+			int node = tour.get(k);
+			if (node != -1) {
+				load += reqList.get(node + 1).getDemand();
+			}
+		}
+		return load;
+	}
+
 	static boolean checkFeasibleTourRelocationMultiple(Ant a, VRPTW vrp, int indexTourSource, int indexTourDestination, int i, int j) {
 		boolean isFeasible = true;
 		int city, previousCity, prevCity, nextCity, currentCity;
@@ -406,20 +443,23 @@ public class VRPTW_ACS implements Runnable {
 		double value1, value2, value3, value4;
 		
 		city = a.tours.get(indexTourSource).get(i);
-		currentQuantity = a.currentQuantity.get(indexTourDestination) + reqList.get(city + 1).getDemand();
+		// Use per-trip load at insertion point j in destination tour
+		currentQuantity = computeTripLoad(a, vrp, indexTourDestination, j) + reqList.get(city + 1).getDemand();
 		if (currentQuantity > vrp.getCapacity()) {
 			return false;
 		}
 		
-		//check time window constraints in source tour
+		//check time window constraints in source tour (skip -1 depot markers)
 		for (int pos = i + 1; pos < a.tours.get(indexTourSource).size(); pos++) {
+			currentCity = a.tours.get(indexTourSource).get(pos);
+			if (currentCity == -1) continue;
 			if (pos == (i + 1)) {
-				prevCity = a.tours.get(indexTourSource).get(pos - 2);
-				currentCity = a.tours.get(indexTourSource).get(pos);
+				prevCity = a.tours.get(indexTourSource).get(i - 1);
 				currentTime = a.beginService[prevCity + 1];
 			}
 			else {
 				prevCity = a.tours.get(indexTourSource).get(pos - 1);
+				if (prevCity == -1) prevCity = -1; // depot sentinel maps to index 0
         		currentCity = a.tours.get(indexTourSource).get(pos);
 			}
 			distance = VRPTW.instance.distance[prevCity + 1][currentCity + 1];
@@ -455,6 +495,11 @@ public class VRPTW_ACS implements Runnable {
 		
 		previousCity = a.tours.get(indexTourDestination).get(j - 1);
         nextCity = a.tours.get(indexTourDestination).get(j);
+
+        // Do not insert adjacent to a depot-return marker
+        if (previousCity == -1 || nextCity == -1) {
+            return false;
+        }
     	
     	arrivalTime = a.beginService[previousCity + 1] + reqList.get(previousCity + 1).getServiceTime() + VRPTW.instance.distance[previousCity + 1][city + 1]; 
     	beginService = Math.max(arrivalTime, reqList.get(city + 1).getStartWindow());
@@ -470,12 +515,19 @@ public class VRPTW_ACS implements Runnable {
     	}
     	currentTime = beginService;
 		
-		//check time window constraints in destination tour
+		//check time window constraints in destination tour (skip -1 depot markers)
 		for (int pos = j + 1; pos < a.tours.get(indexTourDestination).size(); pos++) {
 			prevCity = a.tours.get(indexTourDestination).get(pos - 1);
     		currentCity = a.tours.get(indexTourDestination).get(pos);
-			distance = VRPTW.instance.distance[prevCity + 1][currentCity + 1];
-	    	arrivalTime = currentTime + reqList.get(prevCity + 1).getServiceTime() + distance; 
+    		if (currentCity == -1) continue;
+    		if (prevCity == -1) {
+    			// After a depot return: time resets to depot arrival; use 0 service time at depot
+    			distance = VRPTW.instance.distance[0][currentCity + 1];
+    			arrivalTime = currentTime + distance;
+    		} else {
+    			distance = VRPTW.instance.distance[prevCity + 1][currentCity + 1];
+    			arrivalTime = currentTime + reqList.get(prevCity + 1).getServiceTime() + distance;
+    		}
 	    	beginService = Math.max(arrivalTime, reqList.get(currentCity + 1).getStartWindow());
 	    	if (beginService > reqList.get(currentCity + 1).getEndWindow()) {
 	    		return false;
@@ -497,10 +549,21 @@ public class VRPTW_ACS implements Runnable {
 			prevCity = a.tours.get(indexTourSource).get(pos - 1);
 			currentCity = a.tours.get(indexTourSource).get(pos);
 			if (pos == i) {
-				currentTime = a.beginService[prevCity + 1];
+				currentTime = a.beginService[(prevCity == -1 ? 0 : prevCity + 1)];
 			}
-			distance = VRPTW.instance.distance[prevCity + 1][currentCity + 1];
-	    	arrivalTime = currentTime + reqList.get(prevCity + 1).getServiceTime() + distance; 
+			if (currentCity == -1) {
+				// depot-return: advance time to depot, reset for next trip
+				distance = VRPTW.instance.distance[(prevCity == -1 ? 0 : prevCity + 1)][0];
+				currentTime = currentTime + (prevCity == -1 ? 0 : reqList.get(prevCity + 1).getServiceTime()) + distance;
+				continue;
+			}
+			if (prevCity == -1) {
+				distance = VRPTW.instance.distance[0][currentCity + 1];
+				arrivalTime = currentTime + distance;
+			} else {
+				distance = VRPTW.instance.distance[prevCity + 1][currentCity + 1];
+				arrivalTime = currentTime + reqList.get(prevCity + 1).getServiceTime() + distance;
+			}
 	    	beginService = Math.max(arrivalTime, reqList.get(currentCity + 1).getStartWindow());
 	    	currentTime = beginService;
 	    	a.beginService[currentCity + 1] = beginService;	
@@ -511,14 +574,26 @@ public class VRPTW_ACS implements Runnable {
 		a.currentTime.set(indexTourSource, beginService);
 		
 		//update of begin service times for the destination tour
+		beginService = 0.0;
+		currentTime = 0.0;
 		for (int pos = j; pos < a.tours.get(indexTourDestination).size() - 1; pos++) {
 			prevCity = a.tours.get(indexTourDestination).get(pos - 1);
 			currentCity = a.tours.get(indexTourDestination).get(pos);
 			if (pos == j) {
-				currentTime = a.beginService[prevCity + 1];
+				currentTime = a.beginService[(prevCity == -1 ? 0 : prevCity + 1)];
 			}
-			distance = VRPTW.instance.distance[prevCity + 1][currentCity + 1];
-	    	arrivalTime = currentTime + reqList.get(prevCity + 1).getServiceTime() + distance; 
+			if (currentCity == -1) {
+				distance = VRPTW.instance.distance[(prevCity == -1 ? 0 : prevCity + 1)][0];
+				currentTime = currentTime + (prevCity == -1 ? 0 : reqList.get(prevCity + 1).getServiceTime()) + distance;
+				continue;
+			}
+			if (prevCity == -1) {
+				distance = VRPTW.instance.distance[0][currentCity + 1];
+				arrivalTime = currentTime + distance;
+			} else {
+				distance = VRPTW.instance.distance[prevCity + 1][currentCity + 1];
+				arrivalTime = currentTime + reqList.get(prevCity + 1).getServiceTime() + distance;
+			}
 	    	beginService = Math.max(arrivalTime, reqList.get(currentCity + 1).getStartWindow());
 	    	currentTime = beginService;
 	    	a.beginService[currentCity + 1] = beginService;	
@@ -611,7 +686,8 @@ public class VRPTW_ACS implements Runnable {
 					else {
 						startIndexDestination = lastCommitedIndexes.get(indexTourDestination) + 1;
 					}
-					for (int i = startIndexSource; i < a.tours.get(indexTourSource).size() - 1; i++) { 
+					for (int i = startIndexSource; i < a.tours.get(indexTourSource).size() - 1; i++) {
+						if (a.tours.get(indexTourSource).get(i) == -1) continue; // skip depot-return markers
 						for (int j = startIndexDestination; j < a.tours.get(indexTourDestination).size(); j++) {
 							//check if results a feasible solution (i.e. no time window constraint is violated)
 							feasible = checkFeasibleTourRelocationMultiple(temp, instance, indexTourSource, indexTourDestination, i, j);
@@ -783,20 +859,21 @@ public class VRPTW_ACS implements Runnable {
 						else {
 							startIndexDestination = lastCommitedIndexes.get(indexTourDestination) + 1;
 						}
-						for (int i = startIndexSource; i < temp.tours.get(indexTourSource).size() - 1; i++) { 
-							for (int j = startIndexDestination; j < temp.tours.get(indexTourDestination).size(); j++) {
-								//check if results a feasible solution (i.e. no time window constraint is violated)
-								feasible = checkFeasibleTourRelocationMultiple(temp, instance, indexTourSource, indexTourDestination, i, j);
-								if (feasible) {
-									//obtain the neighbour solution corresponding to the relocation operator
-									city = temp.tours.get(indexTourSource).get(i);
-								    temp.tours.get(indexTourSource).remove(i);
-								    temp.tours.get(indexTourDestination).add(j, city);
-								    
-								    /*isValid = Utilities.checkFeasibility(temp, instance, false);
-						    	    if (!isValid) {
-						    	    	System.out.println("Inside relocateMultipleRouteIterated: The resulted solution is not valid (feasible)..");
-						    	    }*/
+					for (int i = startIndexSource; i < temp.tours.get(indexTourSource).size() - 1; i++) {
+						if (temp.tours.get(indexTourSource).get(i) == -1) continue; // skip depot-return markers
+						for (int j = startIndexDestination; j < temp.tours.get(indexTourDestination).size(); j++) {
+							//check if results a feasible solution (i.e. no time window constraint is violated)
+							feasible = checkFeasibleTourRelocationMultiple(temp, instance, indexTourSource, indexTourDestination, i, j);
+							if (feasible) {
+								//obtain the neighbour solution corresponding to the relocation operator
+								city = temp.tours.get(indexTourSource).get(i);
+							    temp.tours.get(indexTourSource).remove(i);
+							    temp.tours.get(indexTourDestination).add(j, city);
+							    
+							    /*isValid = Utilities.checkFeasibility(temp, instance, false);
+					    	    if (!isValid) {
+					    	    	System.out.println("Inside relocateMultipleRouteIterated: The resulted solution is not valid (feasible)..");
+					    	    }*/
 									
 								    newQuantity1 = temp.currentQuantity.get(indexTourSource) - reqList.get(city + 1).getDemand();
 								    temp.currentQuantity.set(indexTourSource, newQuantity1);
@@ -929,38 +1006,39 @@ public class VRPTW_ACS implements Runnable {
     		Ants.copy_from_to(improvedAnt, a, instance);
     		Ants.copy_from_to(a, temp, instance);
     		
-    		indexTourSource = findShortestTour(a);
-			for (int indexTourDestination = 0; indexTourDestination < a.usedVehicles; indexTourDestination++) {
-				if (indexTourSource != indexTourDestination) {
-					//index of the element to be moved/relocated
-					if (indexTourSource > lastCommitedIndexes.size() - 1) {
-						startIndexSource = 1;
-					}
-					else {
-						startIndexSource = lastCommitedIndexes.get(indexTourSource) + 1;
-					}
-					
-					//index of the relocation's destination
-					if (indexTourDestination > lastCommitedIndexes.size() - 1) {
-						startIndexDestination = 1;
-					}
-					else {
-						startIndexDestination = lastCommitedIndexes.get(indexTourDestination) + 1;
-					}
-					for (int i = startIndexSource; i < a.tours.get(indexTourSource).size() - 1; i++) { 
-						for (int j = startIndexDestination; j < a.tours.get(indexTourDestination).size(); j++) {
-							//check if results a feasible solution (i.e. no time window constraint is violated)
-							feasible = checkFeasibleTourRelocationMultiple(temp, instance, indexTourSource, indexTourDestination, i, j);
-							if (feasible) {
-								//obtain the neighbour solution corresponding to the relocation operator
-								city = temp.tours.get(indexTourSource).get(i);
-							    temp.tours.get(indexTourSource).remove(i);
-							    temp.tours.get(indexTourDestination).add(j, city);
-								
-							    newQuantity1 = temp.currentQuantity.get(indexTourSource) - reqList.get(city + 1).getDemand();
-							    temp.currentQuantity.set(indexTourSource, newQuantity1);
-							    newQuantity2 = temp.currentQuantity.get(indexTourDestination) + reqList.get(city + 1).getDemand();
-							    temp.currentQuantity.set(indexTourDestination, newQuantity2); 
+		indexTourSource = findShortestTour(a);
+		for (int indexTourDestination = 0; indexTourDestination < a.usedVehicles; indexTourDestination++) {
+			if (indexTourSource != indexTourDestination) {
+				//index of the element to be moved/relocated
+				if (indexTourSource > lastCommitedIndexes.size() - 1) {
+					startIndexSource = 1;
+				}
+				else {
+					startIndexSource = lastCommitedIndexes.get(indexTourSource) + 1;
+				}
+				
+				//index of the relocation's destination
+				if (indexTourDestination > lastCommitedIndexes.size() - 1) {
+					startIndexDestination = 1;
+				}
+				else {
+					startIndexDestination = lastCommitedIndexes.get(indexTourDestination) + 1;
+				}
+				for (int i = startIndexSource; i < a.tours.get(indexTourSource).size() - 1; i++) {
+					if (a.tours.get(indexTourSource).get(i) == -1) continue; // skip depot-return markers
+					for (int j = startIndexDestination; j < a.tours.get(indexTourDestination).size(); j++) {
+						//check if results a feasible solution (i.e. no time window constraint is violated)
+						feasible = checkFeasibleTourRelocationMultiple(temp, instance, indexTourSource, indexTourDestination, i, j);
+						if (feasible) {
+							//obtain the neighbour solution corresponding to the relocation operator
+							city = temp.tours.get(indexTourSource).get(i);
+						    temp.tours.get(indexTourSource).remove(i);
+						    temp.tours.get(indexTourDestination).add(j, city);
+							
+						    newQuantity1 = temp.currentQuantity.get(indexTourSource) - reqList.get(city + 1).getDemand();
+						    temp.currentQuantity.set(indexTourSource, newQuantity1);
+						    newQuantity2 = temp.currentQuantity.get(indexTourDestination) + reqList.get(city + 1).getDemand();
+						    temp.currentQuantity.set(indexTourDestination, newQuantity2);
 							   
 								//update the begin service times of the nodes from the source and destination tours of the obtained neighbour solution 
 								//also update the current time of the source and destination tours
@@ -1018,32 +1096,38 @@ public class VRPTW_ACS implements Runnable {
 		//check vehicle capacity tour constraints for source and destination tours
 		city1 = a.tours.get(indexTourSource).get(i);
 		city2 = a.tours.get(indexTourDestination).get(j);
-		currentQuantity = a.currentQuantity.get(indexTourSource) - reqList.get(city1 + 1).getDemand() + reqList.get(city2 + 1).getDemand();
+		// Use per-trip load for capacity check
+		currentQuantity = computeTripLoad(a, vrp, indexTourSource, i) - reqList.get(city1 + 1).getDemand() + reqList.get(city2 + 1).getDemand();
 		if (currentQuantity > vrp.getCapacity()) {
 			return false;
 		}
-		currentQuantity = a.currentQuantity.get(indexTourDestination) - reqList.get(city2 + 1).getDemand() + reqList.get(city1 + 1).getDemand();
+		currentQuantity = computeTripLoad(a, vrp, indexTourDestination, j) - reqList.get(city2 + 1).getDemand() + reqList.get(city1 + 1).getDemand();
 		if (currentQuantity > vrp.getCapacity()) {
 			return false;
 		}
 		
-		//check feasibility for source tour regarding time windows constraints
+		//check feasibility for source tour regarding time windows constraints (skip -1 depot markers)
 		for (int pos = i; pos < a.tours.get(indexTourSource).size(); pos++) {
+			currentCity = (pos == i) ? city2 : a.tours.get(indexTourSource).get(pos);
+			if (currentCity == -1) continue;
 			if (pos == i) {
 				prevCity = a.tours.get(indexTourSource).get(pos - 1);
-				currentCity = a.tours.get(indexTourDestination).get(j);
 				currentTime = a.beginService[prevCity + 1];
 			}
 			else if (pos == (i + 1)) {
-				prevCity = a.tours.get(indexTourDestination).get(j);
-				currentCity = a.tours.get(indexTourSource).get(pos);
+				prevCity = city2;
 			}
 			else {
 				prevCity = a.tours.get(indexTourSource).get(pos - 1);
         		currentCity = a.tours.get(indexTourSource).get(pos);
 			}
-			distance = VRPTW.instance.distance[prevCity + 1][currentCity + 1];
-	    	arrivalTime = currentTime + reqList.get(prevCity + 1).getServiceTime() + distance; 
+			if (prevCity == -1) {
+				distance = VRPTW.instance.distance[0][currentCity + 1];
+				arrivalTime = currentTime + distance;
+			} else {
+				distance = VRPTW.instance.distance[prevCity + 1][currentCity + 1];
+	    		arrivalTime = currentTime + reqList.get(prevCity + 1).getServiceTime() + distance;
+	    	}
 	    	beginService = Math.max(arrivalTime, reqList.get(currentCity + 1).getStartWindow());
 	    	if (beginService > reqList.get(currentCity + 1).getEndWindow()) {
 	    		return false;
@@ -1051,23 +1135,28 @@ public class VRPTW_ACS implements Runnable {
 	    	currentTime = beginService;
 		}
 		
-		//check feasibility for destination tour regarding time windows constraints
+		//check feasibility for destination tour regarding time windows constraints (skip -1 depot markers)
 		for (int pos = j; pos < a.tours.get(indexTourDestination).size(); pos++) {
+			currentCity = (pos == j) ? city1 : a.tours.get(indexTourDestination).get(pos);
+			if (currentCity == -1) continue;
 			if (pos == j) {
 				prevCity = a.tours.get(indexTourDestination).get(pos - 1);
-				currentCity = a.tours.get(indexTourSource).get(i);
 				currentTime = a.beginService[prevCity + 1];
 			}
 			else if (pos == (j + 1)) {
-				prevCity = a.tours.get(indexTourSource).get(i);
-				currentCity = a.tours.get(indexTourDestination).get(pos);
+				prevCity = city1;
 			}
 			else {
 				prevCity = a.tours.get(indexTourDestination).get(pos - 1);
         		currentCity = a.tours.get(indexTourDestination).get(pos);
 			}
-			distance = VRPTW.instance.distance[prevCity + 1][currentCity + 1];
-	    	arrivalTime = currentTime + reqList.get(prevCity + 1).getServiceTime() + distance; 
+			if (prevCity == -1) {
+				distance = VRPTW.instance.distance[0][currentCity + 1];
+				arrivalTime = currentTime + distance;
+			} else {
+				distance = VRPTW.instance.distance[prevCity + 1][currentCity + 1];
+	    		arrivalTime = currentTime + reqList.get(prevCity + 1).getServiceTime() + distance;
+	    	}
 	    	beginService = Math.max(arrivalTime, reqList.get(currentCity + 1).getStartWindow());
 	    	if (beginService > reqList.get(currentCity + 1).getEndWindow()) {
 	    		return false;
@@ -1089,10 +1178,20 @@ public class VRPTW_ACS implements Runnable {
 			prevCity = a.tours.get(indexTourSource).get(pos - 1);
 			currentCity = a.tours.get(indexTourSource).get(pos);
 			if (pos == i) {
-				currentTime = a.beginService[prevCity + 1];
+				currentTime = a.beginService[(prevCity == -1 ? 0 : prevCity + 1)];
 			}
-			distance = VRPTW.instance.distance[prevCity + 1][currentCity + 1];
-	    	arrivalTime = currentTime + reqList.get(prevCity + 1).getServiceTime() + distance; 
+			if (currentCity == -1) {
+				distance = VRPTW.instance.distance[(prevCity == -1 ? 0 : prevCity + 1)][0];
+				currentTime = currentTime + (prevCity == -1 ? 0 : reqList.get(prevCity + 1).getServiceTime()) + distance;
+				continue;
+			}
+			if (prevCity == -1) {
+				distance = VRPTW.instance.distance[0][currentCity + 1];
+				arrivalTime = currentTime + distance;
+			} else {
+				distance = VRPTW.instance.distance[prevCity + 1][currentCity + 1];
+				arrivalTime = currentTime + reqList.get(prevCity + 1).getServiceTime() + distance;
+			}
 	    	beginService = Math.max(arrivalTime, reqList.get(currentCity + 1).getStartWindow());
 	    	currentTime = beginService;
 	    	a.beginService[currentCity + 1] = beginService;
@@ -1102,14 +1201,26 @@ public class VRPTW_ACS implements Runnable {
 		}
 		a.currentTime.set(indexTourSource, beginService);
 		
+		beginService = 0.0;
+		currentTime = 0.0;
 		for (int pos = j; pos < a.tours.get(indexTourDestination).size() - 1; pos++) {
 			prevCity = a.tours.get(indexTourDestination).get(pos - 1);
 			currentCity = a.tours.get(indexTourDestination).get(pos);
 			if (pos == j) {
-				currentTime = a.beginService[prevCity + 1];
+				currentTime = a.beginService[(prevCity == -1 ? 0 : prevCity + 1)];
 			}
-			distance = VRPTW.instance.distance[prevCity + 1][currentCity + 1];
-	    	arrivalTime = currentTime + reqList.get(prevCity + 1).getServiceTime() + distance; 
+			if (currentCity == -1) {
+				distance = VRPTW.instance.distance[(prevCity == -1 ? 0 : prevCity + 1)][0];
+				currentTime = currentTime + (prevCity == -1 ? 0 : reqList.get(prevCity + 1).getServiceTime()) + distance;
+				continue;
+			}
+			if (prevCity == -1) {
+				distance = VRPTW.instance.distance[0][currentCity + 1];
+				arrivalTime = currentTime + distance;
+			} else {
+				distance = VRPTW.instance.distance[prevCity + 1][currentCity + 1];
+				arrivalTime = currentTime + reqList.get(prevCity + 1).getServiceTime() + distance;
+			}
 	    	beginService = Math.max(arrivalTime, reqList.get(currentCity + 1).getStartWindow());
 	    	currentTime = beginService;
 	    	a.beginService[currentCity + 1] = beginService;
@@ -1191,31 +1302,33 @@ public class VRPTW_ACS implements Runnable {
 						startIndexSource = lastCommitedIndexes.get(indexTourSource) + 1;
 					}
 					
-					//index of the element to be moved from the destination tour
-					if (indexTourDestination > lastCommitedIndexes.size() - 1) {
-						startIndexDestination = 1;
-					}
-					else {
-						startIndexDestination = lastCommitedIndexes.get(indexTourDestination) + 1;
-					}
-					for (int i = startIndexSource; i < a.tours.get(indexTourSource).size() - 1; i++) { 
-						for (int j = startIndexDestination; j < a.tours.get(indexTourDestination).size() - 1; j++) {
-							if (indexTourSource <= indexTourDestination) {
-								//check if results a feasible solution (i.e. no time window constraint is violated)
-								feasible = checkFeasibleTourExchangeMultiple(temp, instance, indexTourSource, indexTourDestination, i, j);
-								if (feasible) {
-									//obtain the neighbour solution corresponding to the relocation operator
-									city1 = temp.tours.get(indexTourSource).get(i);
-									city2 = temp.tours.get(indexTourDestination).get(j);
-								    temp.tours.get(indexTourSource).set(i, city2);
-								    temp.tours.get(indexTourDestination).set(j, city1);
-									
-								    newQuantity1 = temp.currentQuantity.get(indexTourSource) - reqList.get(city1 + 1).getDemand() + reqList.get(city2 + 1).getDemand();
-								    temp.currentQuantity.set(indexTourSource, newQuantity1);
-								    newQuantity2 = temp.currentQuantity.get(indexTourDestination) - reqList.get(city2 + 1).getDemand() + reqList.get(city1 + 1).getDemand();
-								    temp.currentQuantity.set(indexTourDestination, newQuantity2); 
-								   
-								    //update the begin service times of the nodes from the source and destination tours of the obtained neighbour solution 
+				//index of the element to be moved from the destination tour
+				if (indexTourDestination > lastCommitedIndexes.size() - 1) {
+					startIndexDestination = 1;
+				}
+				else {
+					startIndexDestination = lastCommitedIndexes.get(indexTourDestination) + 1;
+				}
+				for (int i = startIndexSource; i < a.tours.get(indexTourSource).size() - 1; i++) {
+					if (a.tours.get(indexTourSource).get(i) == -1) continue; // skip depot-return markers
+					for (int j = startIndexDestination; j < a.tours.get(indexTourDestination).size() - 1; j++) {
+						if (a.tours.get(indexTourDestination).get(j) == -1) continue; // skip depot-return markers
+						if (indexTourSource <= indexTourDestination) {
+							//check if results a feasible solution (i.e. no time window constraint is violated)
+							feasible = checkFeasibleTourExchangeMultiple(temp, instance, indexTourSource, indexTourDestination, i, j);
+							if (feasible) {
+								//obtain the neighbour solution corresponding to the relocation operator
+								city1 = temp.tours.get(indexTourSource).get(i);
+								city2 = temp.tours.get(indexTourDestination).get(j);
+							    temp.tours.get(indexTourSource).set(i, city2);
+							    temp.tours.get(indexTourDestination).set(j, city1);
+								
+							    newQuantity1 = temp.currentQuantity.get(indexTourSource) - reqList.get(city1 + 1).getDemand() + reqList.get(city2 + 1).getDemand();
+							    temp.currentQuantity.set(indexTourSource, newQuantity1);
+							    newQuantity2 = temp.currentQuantity.get(indexTourDestination) - reqList.get(city2 + 1).getDemand() + reqList.get(city1 + 1).getDemand();
+							    temp.currentQuantity.set(indexTourDestination, newQuantity2); 
+							   
+							    //update the begin service times of the nodes from the source and destination tours of the obtained neighbour solution
 									//also update the current time of the source and destination tours
 									updateBeginServiceExchangeMultiple(temp, instance, indexTourSource, indexTourDestination, i, j);
 								
@@ -1338,34 +1451,36 @@ public class VRPTW_ACS implements Runnable {
 							startIndexSource = lastCommitedIndexes.get(indexTourSource) + 1;
 						}
 						
-						//index of the element to be moved from the destination tour
-						if (indexTourDestination > lastCommitedIndexes.size() - 1) {
-							startIndexDestination = 1;
-						}
-						else {
-							startIndexDestination = lastCommitedIndexes.get(indexTourDestination) + 1;
-						}
-						for (int i = startIndexSource; i < temp.tours.get(indexTourSource).size() - 1; i++) { 
-							for (int j = startIndexDestination; j < temp.tours.get(indexTourDestination).size() - 1; j++) {
-								if (indexTourSource <= indexTourDestination) {
-									//check if results a feasible solution (i.e. no time window constraint is violated)
-									feasible = checkFeasibleTourExchangeMultiple(temp, instance, indexTourSource, indexTourDestination, i, j);
-									if (feasible) {
-										//obtain the neighbour solution corresponding to the relocation operator
-										city1 = temp.tours.get(indexTourSource).get(i);
-										city2 = temp.tours.get(indexTourDestination).get(j);
-									    temp.tours.get(indexTourSource).set(i, city2);
-									    temp.tours.get(indexTourDestination).set(j, city1);
-									    
-									    /*isValid = Utilities.checkFeasibility(temp, instance, false);
-							    	    if (!isValid) {
-							    	    	System.out.println("Inside exchangeMultipleRouteIterated: The resulted solution is not valid (feasible)..");
-							    	    }*/
-										
-									    newQuantity1 = temp.currentQuantity.get(indexTourSource) - reqList.get(city1 + 1).getDemand() + reqList.get(city2 + 1).getDemand();
-									    temp.currentQuantity.set(indexTourSource, newQuantity1);
-									    newQuantity2 = temp.currentQuantity.get(indexTourDestination) - reqList.get(city2 + 1).getDemand() + reqList.get(city1 + 1).getDemand();
-									    temp.currentQuantity.set(indexTourDestination, newQuantity2); 
+					//index of the element to be moved from the destination tour
+					if (indexTourDestination > lastCommitedIndexes.size() - 1) {
+						startIndexDestination = 1;
+					}
+					else {
+						startIndexDestination = lastCommitedIndexes.get(indexTourDestination) + 1;
+					}
+					for (int i = startIndexSource; i < temp.tours.get(indexTourSource).size() - 1; i++) {
+						if (temp.tours.get(indexTourSource).get(i) == -1) continue; // skip depot-return markers
+						for (int j = startIndexDestination; j < temp.tours.get(indexTourDestination).size() - 1; j++) {
+							if (temp.tours.get(indexTourDestination).get(j) == -1) continue; // skip depot-return markers
+							if (indexTourSource <= indexTourDestination) {
+								//check if results a feasible solution (i.e. no time window constraint is violated)
+								feasible = checkFeasibleTourExchangeMultiple(temp, instance, indexTourSource, indexTourDestination, i, j);
+								if (feasible) {
+									//obtain the neighbour solution corresponding to the relocation operator
+									city1 = temp.tours.get(indexTourSource).get(i);
+									city2 = temp.tours.get(indexTourDestination).get(j);
+								    temp.tours.get(indexTourSource).set(i, city2);
+								    temp.tours.get(indexTourDestination).set(j, city1);
+								    
+								    /*isValid = Utilities.checkFeasibility(temp, instance, false);
+						    	    if (!isValid) {
+						    	    	System.out.println("Inside exchangeMultipleRouteIterated: The resulted solution is not valid (feasible)..");
+						    	    }*/
+									
+								    newQuantity1 = temp.currentQuantity.get(indexTourSource) - reqList.get(city1 + 1).getDemand() + reqList.get(city2 + 1).getDemand();
+								    temp.currentQuantity.set(indexTourSource, newQuantity1);
+								    newQuantity2 = temp.currentQuantity.get(indexTourDestination) - reqList.get(city2 + 1).getDemand() + reqList.get(city1 + 1).getDemand();
+								    temp.currentQuantity.set(indexTourDestination, newQuantity2);
 									   
 									    //update the begin service times of the nodes from the source and destination tours of the obtained neighbour solution 
 										//also update the current time of the source and destination tours
