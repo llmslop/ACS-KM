@@ -76,6 +76,44 @@ void test_simulate_dynamic_release() {
            "Expected unique node IDs count to match dynamic request count");
 }
 
+
+void test_simulate_dynamic_release_custom_config() {
+    const std::filesystem::path input = std::filesystem::path(ACS_KM_SOURCE_DIR) / "input" / "r101-1.0.txt";
+    const acs_km::DataReader reader(input);
+    const auto data = reader.read();
+
+    const acs_km::SimulationConfig config{
+        .working_day_seconds = 120.0,
+        .time_slices = 60,
+    };
+    const auto simulation = acs_km::simulate_dynamic_release(data, config);
+
+    expect(simulation.scaling_value > 0.0, "Expected positive scaling value with custom config");
+    expect(simulation.slice_length_seconds == 2.0, "Expected custom time-slice length of 2 seconds");
+    expect(simulation.total_newly_available == data.dynamic_requests.size(),
+           "Expected custom config simulation to release all dynamic requests");
+}
+
+void test_simulate_dynamic_release_invalid_config() {
+    const std::filesystem::path input = std::filesystem::path(ACS_KM_SOURCE_DIR) / "input" / "r101-1.0.txt";
+    const acs_km::DataReader reader(input);
+    const auto data = reader.read();
+
+    bool threw = false;
+    try {
+        (void)acs_km::simulate_dynamic_release(
+            data,
+            acs_km::SimulationConfig{
+                .working_day_seconds = 100.0,
+                .time_slices = 0,
+            });
+    } catch (const std::runtime_error&) {
+        threw = true;
+    }
+
+    expect(threw, "Expected invalid simulation config to throw runtime_error");
+}
+
 void test_simulate_dynamic_release_no_dynamic_requests() {
     const std::filesystem::path input = std::filesystem::path(ACS_KM_SOURCE_DIR) / "input" / "r101-0.0.txt";
     const acs_km::DataReader reader(input);
@@ -108,6 +146,8 @@ int main() {
         test_dynamic_instance();
         test_collect_newly_available_nodes();
         test_simulate_dynamic_release();
+        test_simulate_dynamic_release_custom_config();
+        test_simulate_dynamic_release_invalid_config();
         test_simulate_dynamic_release_no_dynamic_requests();
         std::cout << "All data reader tests passed\n";
         return EXIT_SUCCESS;
