@@ -31,19 +31,19 @@ void test_static_instance() {
 }
 
 
-void test_count_new_available_nodes() {
+void test_collect_newly_available_nodes() {
     const std::filesystem::path input = std::filesystem::path(ACS_KM_SOURCE_DIR) / "input" / "r101-1.0.txt";
     const acs_km::DataReader reader(input);
     const auto data = reader.read();
 
     std::size_t cursor = 0;
-    const auto early_nodes = acs_km::count_new_available_nodes(data.dynamic_requests, 10.0, cursor);
-    const auto later_nodes = acs_km::count_new_available_nodes(data.dynamic_requests, 120.0, cursor);
+    const auto early_nodes = acs_km::collect_newly_available_nodes(data.dynamic_requests, 10.0, cursor);
+    const auto later_nodes = acs_km::collect_newly_available_nodes(data.dynamic_requests, 120.0, cursor);
 
     expect(!early_nodes.empty(), "Expected at least one node to become available by t=10");
     expect(!later_nodes.empty(), "Expected additional nodes to become available by t=120");
 
-    const auto all_remaining_nodes = acs_km::count_new_available_nodes(data.dynamic_requests, 1e9, cursor);
+    const auto all_remaining_nodes = acs_km::collect_newly_available_nodes(data.dynamic_requests, 1e9, cursor);
     const auto total_returned = early_nodes.size() + later_nodes.size() + all_remaining_nodes.size();
     expect(total_returned == data.dynamic_requests.size(),
            "Expected utility to emit each dynamic request exactly once");
@@ -68,7 +68,7 @@ int main() {
     try {
         test_static_instance();
         test_dynamic_instance();
-        test_count_new_available_nodes();
+        test_collect_newly_available_nodes();
         std::cout << "All data reader tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& ex) {

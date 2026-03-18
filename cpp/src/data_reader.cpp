@@ -90,6 +90,8 @@ InstanceData DataReader::read() const {
             if (request.available_time > 0.0) {
                 data.dynamic_requests.push_back(request);
             } else if (request.id > 0) {
+                // Match original Java semantics: customer IDs are 1-based and stored as
+                // 0-based internal node indexes by subtracting 1 (depot id 0 is excluded).
                 data.available_request_ids.push_back(request.id - 1);
             }
             continue;

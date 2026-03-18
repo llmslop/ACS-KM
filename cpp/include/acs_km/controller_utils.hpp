@@ -7,7 +7,7 @@
 
 namespace acs_km {
 
-inline std::vector<int> count_new_available_nodes(const std::vector<Request>& dynamic_requests,
+inline std::vector<int> collect_newly_available_nodes(const std::vector<Request>& dynamic_requests,
                                                   const double current_time,
                                                   std::size_t& last_known_dynamic_index) {
     std::vector<int> nodes;
