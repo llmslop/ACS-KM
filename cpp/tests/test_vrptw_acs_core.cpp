@@ -82,6 +82,30 @@ void test_committed_tours_and_add_nodes() {
     expect(ant.visited[0], "Expected inserted committed node marked visited");
 }
 
+void test_shortest_tour_and_calc_dist_and_compare() {
+    auto instance = make_instance();
+
+    acs_km::AntSolution ant;
+    ant.used_vehicles = 2;
+    ant.tours = {{-1, 0, 1, -1}, {-1, 1, -1}};
+    expect(acs_km::find_shortest_tour(ant) == 1, "Expected second tour shortest");
+
+    const auto score = acs_km::calc_tour_dist({-1, 0, -1}, instance);
+    expect(score < 0, "Expected negative finite score for feasible tour");
+
+    auto tight = instance;
+    tight.requests[1].end_window = 0.0;
+    expect(acs_km::calc_tour_dist({-1, 0, -1}, tight) == -100000000, "Expected hard penalty for infeasible tour");
+
+    acs_km::AntSolution incumbent;
+    incumbent.used_vehicles = 2;
+    incumbent.total_tour_length = 100.0;
+    acs_km::AntSolution candidate;
+    candidate.used_vehicles = 1;
+    candidate.total_tour_length = 120.0;
+    expect(acs_km::is_better_solution(candidate, incumbent), "Expected fewer vehicles to dominate");
+}
+
 }  // namespace
 
 int main() {
@@ -89,6 +113,7 @@ int main() {
         test_termination_and_weights();
         test_is_done_and_feasible();
         test_committed_tours_and_add_nodes();
+        test_shortest_tour_and_calc_dist_and_compare();
         std::cout << "All vrptw_acs core tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& ex) {

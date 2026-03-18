@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cmath>
+#include <limits>
 #include <stdexcept>
 
 #include "acs_km/controller_utils.hpp"
@@ -60,6 +62,62 @@ bool check_committed_tours(const AntAlgorithmState& ants) {
         }
     }
     return false;
+}
+
+int find_shortest_tour(const AntSolution& ant) {
+    if (ant.tours.empty()) {
+        return 0;
+    }
+    auto index_tour = 0;
+    auto min_size = std::numeric_limits<std::size_t>::max();
+    for (int i = 0; i < ant.used_vehicles && static_cast<std::size_t>(i) < ant.tours.size(); ++i) {
+        if (ant.tours[static_cast<std::size_t>(i)].size() < min_size) {
+            min_size = ant.tours[static_cast<std::size_t>(i)].size();
+            index_tour = i;
+        }
+    }
+    return index_tour;
+}
+
+int calc_tour_dist(const std::vector<int>& tour, const InstanceData& vrp) {
+    if (tour.empty()) {
+        return 0;
+    }
+    const auto& req_list = vrp.requests;
+    auto current_time = 0.0;
+    auto current_quantity = 0.0;
+    auto total_distance = 0.0;
+
+    for (std::size_t i = 1; i < tour.size(); ++i) {
+        const auto prev_city = tour[i - 1];
+        const auto current_city = tour[i];
+        const auto prev_index = static_cast<std::size_t>(prev_city + 1);
+        const auto curr_index = static_cast<std::size_t>(current_city + 1);
+        const auto distance = vrp.problem.distance[prev_index][curr_index];
+        current_quantity += req_list[curr_index].demand;
+        if (current_quantity > static_cast<double>(vrp.problem.capacity)) {
+            return -100000000;
+        }
+        const auto arrival_time = current_time + req_list[prev_index].service_time + distance;
+        const auto begin_service = std::max(arrival_time, req_list[curr_index].start_window);
+        if (begin_service > req_list[curr_index].end_window) {
+            return -100000000;
+        }
+        current_time = begin_service;
+        total_distance += distance;
+    }
+
+    const auto score = static_cast<int>(total_distance * 300.0);
+    return -score;
+}
+
+bool is_better_solution(const AntSolution& candidate, const AntSolution& incumbent) {
+    constexpr auto kTempNo = 1e10;
+    const auto round1 = std::round(candidate.total_tour_length * kTempNo) / kTempNo;
+    const auto round2 = std::round(incumbent.total_tour_length * kTempNo) / kTempNo;
+    return (candidate.used_vehicles < incumbent.used_vehicles) ||
+           ((candidate.used_vehicles == incumbent.used_vehicles) && (round1 < round2)) ||
+           ((round1 < round2) && (incumbent.total_tour_length == std::numeric_limits<double>::max()));
 }
 
 void add_committed_nodes(AntSolution& ant,

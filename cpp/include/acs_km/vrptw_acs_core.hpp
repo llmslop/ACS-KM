@@ -19,6 +19,9 @@ void generate_initial_weights(AntAlgorithmState& ants, UtilitiesCore& random_sou
 
 [[nodiscard]] bool is_done(const AntAlgorithmState& ants);
 [[nodiscard]] bool check_committed_tours(const AntAlgorithmState& ants);
+[[nodiscard]] int find_shortest_tour(const AntSolution& ant);
+[[nodiscard]] int calc_tour_dist(const std::vector<int>& tour, const InstanceData& vrp);
+[[nodiscard]] bool is_better_solution(const AntSolution& candidate, const AntSolution& incumbent);
 
 void add_committed_nodes(AntSolution& ant,
                          const AntAlgorithmState& ants,
