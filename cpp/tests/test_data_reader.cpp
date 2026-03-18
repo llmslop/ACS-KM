@@ -1,10 +1,12 @@
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <set>
 #include <stdexcept>
 
 #include "acs_km/controller_utils.hpp"
 #include "acs_km/data_reader.hpp"
+#include "acs_km/execution_flow.hpp"
 
 namespace {
 
@@ -49,6 +51,42 @@ void test_collect_newly_available_nodes() {
            "Expected utility to emit each dynamic request exactly once");
 }
 
+
+void test_simulate_dynamic_release() {
+    const std::filesystem::path input = std::filesystem::path(ACS_KM_SOURCE_DIR) / "input" / "r101-1.0.txt";
+    const acs_km::DataReader reader(input);
+    const auto data = reader.read();
+
+    const auto simulation = acs_km::simulate_dynamic_release(data);
+
+    expect(simulation.scaling_value > 0.0, "Expected positive scaling value");
+    expect(simulation.slice_length_seconds > 0.0, "Expected positive time-slice length");
+    expect(simulation.total_newly_available == data.dynamic_requests.size(),
+           "Expected simulation to release each dynamic request once");
+
+    std::set<int> unique_ids;
+    for (const auto& event : simulation.events) {
+        expect(event.slice_index >= 1, "Expected positive time-slice index");
+        for (const auto node_id : event.newly_available_node_ids) {
+            unique_ids.insert(node_id);
+        }
+    }
+
+    expect(unique_ids.size() == data.dynamic_requests.size(),
+           "Expected unique node IDs count to match dynamic request count");
+}
+
+void test_simulate_dynamic_release_no_dynamic_requests() {
+    const std::filesystem::path input = std::filesystem::path(ACS_KM_SOURCE_DIR) / "input" / "r101-0.0.txt";
+    const acs_km::DataReader reader(input);
+    const auto data = reader.read();
+
+    const auto simulation = acs_km::simulate_dynamic_release(data);
+
+    expect(simulation.total_newly_available == 0, "Expected zero releases for fully static instance");
+    expect(simulation.events.empty(), "Expected no simulation events for static instance");
+}
+
 void test_dynamic_instance() {
     const std::filesystem::path input = std::filesystem::path(ACS_KM_SOURCE_DIR) / "input" / "r101-1.0.txt";
     const acs_km::DataReader reader(input);
@@ -69,6 +107,8 @@ int main() {
         test_static_instance();
         test_dynamic_instance();
         test_collect_newly_available_nodes();
+        test_simulate_dynamic_release();
+        test_simulate_dynamic_release_no_dynamic_requests();
         std::cout << "All data reader tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& ex) {
