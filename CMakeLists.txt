@@ -8,6 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_library(acs_km_core
     cpp/src/data_reader.cpp
+    cpp/src/km_match.cpp
 )
 
 target_include_directories(acs_km_core PUBLIC cpp/include)
@@ -34,4 +35,8 @@ if (BUILD_TESTING)
   target_link_libraries(acs_km_data_reader_test PRIVATE acs_km_core)
   target_compile_definitions(acs_km_data_reader_test PRIVATE ACS_KM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
   add_test(NAME acs_km_data_reader_test COMMAND acs_km_data_reader_test)
+
+  add_executable(acs_km_km_match_test cpp/tests/test_km_match.cpp)
+  target_link_libraries(acs_km_km_match_test PRIVATE acs_km_core)
+  add_test(NAME acs_km_km_match_test COMMAND acs_km_km_match_test)
 endif()
