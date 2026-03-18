@@ -95,7 +95,7 @@ void test_dynamic_instance() {
     expect(data.problem.vehicle_count == 25, "Expected 25 vehicles");
     expect(data.problem.capacity == 200, "Expected vehicle capacity 200");
     expect(!data.dynamic_requests.empty(), "Expected dynamic requests for dynamic level 1.0");
-    expect(!data.available_request_ids.empty(), "Expected at least some a-priori requests");
+    expect(!data.available_request_ids.empty(), "Expected at least some a priori requests");
     expect(data.dynamic_requests.size() + data.available_request_ids.size() + 1 == data.requests.size(),
            "Expected dynamic + available + depot partition to match total requests");
 }

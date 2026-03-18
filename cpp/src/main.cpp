@@ -58,7 +58,7 @@ int main(int argc, char** argv) {
         if (options.simulate_slices) {
             const auto simulation = acs_km::simulate_dynamic_release(data);
             std::cout << "Scaling value: " << simulation.scaling_value << '\n';
-            std::cout << "Time-slice length: " << simulation.slice_length_seconds << '\n';
+            std::cout << "Time slice length: " << simulation.slice_length_seconds << '\n';
             std::cout << "Slices with new nodes: " << simulation.events.size() << '\n';
             std::cout << "Total newly available nodes observed: " << simulation.total_newly_available << '\n';
         }
