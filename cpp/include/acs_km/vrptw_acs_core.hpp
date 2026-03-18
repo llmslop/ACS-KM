@@ -29,6 +29,7 @@ void acs_global_update(AntAlgorithmState& ants);
 void pheromone_trail_update(AntAlgorithmState& ants, int customer_count);
 void init_try(const InstanceData& instance, AntAlgorithmState& ants, InOutState& inout);
 void update_statistics(const InstanceData& instance, AntAlgorithmState& ants, InOutState& inout);
+void construct_solutions(const InstanceData& instance, AntAlgorithmState& ants, InOutState& inout);
 [[nodiscard]] bool check_feasible_tour_relocation_multiple(const AntSolution& ant,
                                                            const InstanceData& vrp,
                                                            int index_tour_source,

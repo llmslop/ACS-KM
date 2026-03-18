@@ -184,6 +184,23 @@ void test_init_try_and_update_statistics() {
     expect(inout.found_best == 3, "Expected found_best recorded from current iteration");
 }
 
+void test_construct_solutions() {
+    auto instance = make_instance();
+    instance.available_request_ids = {0, 1};
+    acs_km::AntAlgorithmState ants;
+    ants.n_ants = 1;
+    ants.ants = {acs_km::AntSolution{}};
+    ants.acs_flag = false;
+    ants.best_so_far_ant.used_vehicles = 1;
+    ants.best_so_far_ant.tours = {{-1, -1}};
+    ants.committed_nodes = {false, false};
+    acs_km::InOutState inout;
+
+    acs_km::construct_solutions(instance, ants, inout);
+    expect(ants.ants[0].to_visit == 0, "Expected constructed solution to visit all available nodes");
+    expect(ants.ants[0].total_tour_length > 0.0, "Expected positive total length for constructed solution");
+}
+
 }  // namespace
 
 int main() {
@@ -195,6 +212,7 @@ int main() {
         test_relocation_and_exchange_helpers();
         test_pheromone_trail_update_orchestration();
         test_init_try_and_update_statistics();
+        test_construct_solutions();
         std::cout << "All vrptw_acs core tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& ex) {

@@ -13,6 +13,7 @@ void ant_empty_memory(AntSolution& ant, const InstanceData& instance);
 void copy_from_to(const AntSolution& source, AntSolution& destination, const InstanceData& instance);
 [[nodiscard]] std::vector<int> unrouted_customers(const AntSolution& ant, const InstanceData& vrp);
 [[nodiscard]] double compute_tours_amplitude(const AntSolution& ant);
+void choose_closest_next(AntSolution& ant, const InstanceData& instance, int index_salesman);
 void global_update_pheromone(AntAlgorithmState& ants, const AntSolution& ant);
 void global_acs_pheromone_update(AntAlgorithmState& ants, const AntSolution& ant);
 void local_acs_pheromone_update(AntAlgorithmState& ants, const AntSolution& ant, int index_salesman);

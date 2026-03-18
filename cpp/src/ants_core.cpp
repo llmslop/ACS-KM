@@ -196,7 +196,6 @@ void local_acs_pheromone_update(AntAlgorithmState& ants, const AntSolution& ant,
         ants.pheromone[static_cast<std::size_t>(h)][static_cast<std::size_t>(j)];
 }
 
-namespace {
 void choose_closest_next(AntSolution& ant, const InstanceData& instance, const int index_salesman) {
     int next_city = static_cast<int>(instance.customer_count());
     const auto& req_list = instance.requests;
@@ -252,7 +251,6 @@ void choose_closest_next(AntSolution& ant, const InstanceData& instance, const i
     ant.begin_service[static_cast<std::size_t>(next_city + 1)] = best_begin_service;
     ant.current_quantity[static_cast<std::size_t>(index_salesman)] += req_list[static_cast<std::size_t>(next_city + 1)].demand;
 }
-}  // namespace
 
 double nn_tour(AntAlgorithmState& ants, const InstanceData& instance) {
     if (ants.ants.empty()) {

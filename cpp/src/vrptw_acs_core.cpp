@@ -189,6 +189,62 @@ void update_statistics(const InstanceData& instance, AntAlgorithmState& ants, In
     }
 }
 
+void construct_solutions(const InstanceData& instance, AntAlgorithmState& ants, InOutState& inout) {
+    for (auto& ant : ants.ants) {
+        ant_empty_memory(ant, instance);
+    }
+
+    for (auto& ant : ants.ants) {
+        for (int i = 0; i < ant.used_vehicles; ++i) {
+            ant.tours[static_cast<std::size_t>(i)].push_back(-1);
+        }
+    }
+
+    if (check_committed_tours(ants)) {
+        for (auto& ant : ants.ants) {
+            add_committed_nodes(ant, ants, instance);
+        }
+    }
+
+    while (!is_done(ants)) {
+        for (auto& ant : ants.ants) {
+            if (ant.to_visit > 0) {
+                const auto salesman = ant.used_vehicles - 1;
+                choose_closest_next(ant, instance, salesman);
+                if (ants.acs_flag) {
+                    local_acs_pheromone_update(ants, ant, salesman);
+                }
+            }
+        }
+    }
+
+    for (auto& ant : ants.ants) {
+        inout.no_solutions++;
+        auto longest_tour_length = 0.0;
+        auto id_longest_tour = 0;
+        ant.total_tour_length = 0.0;
+        for (int i = 0; i < ant.used_vehicles; ++i) {
+            ant.tours[static_cast<std::size_t>(i)].push_back(-1);
+            ant.tour_lengths[static_cast<std::size_t>(i)] =
+                compute_tour_length_plus1_indexed(ant.tours[static_cast<std::size_t>(i)], instance.problem.distance);
+            ant.total_tour_length += ant.tour_lengths[static_cast<std::size_t>(i)];
+            if (ant.tour_lengths[static_cast<std::size_t>(i)] > longest_tour_length) {
+                longest_tour_length = ant.tour_lengths[static_cast<std::size_t>(i)];
+                id_longest_tour = i;
+            }
+            if (ants.acs_flag) {
+                local_acs_pheromone_update(ants, ant, i);
+            }
+        }
+        ant.longest_tour_length = longest_tour_length;
+        ant.index_longest_tour = id_longest_tour;
+        ant.cost_objectives = {ant.total_tour_length, compute_tours_amplitude(ant)};
+    }
+    if (!ants.ants.empty()) {
+        inout.n_tours += ants.n_ants * ants.ants[0].used_vehicles;
+    }
+}
+
 bool check_feasible_tour_relocation_multiple(const AntSolution& ant,
                                              const InstanceData& vrp,
                                              const int index_tour_source,
