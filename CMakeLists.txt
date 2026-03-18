@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_library(acs_km_core
+    cpp/src/ants_core.cpp
     cpp/src/data_reader.cpp
     cpp/src/inout.cpp
     cpp/src/insertion_heuristic.cpp
@@ -55,4 +56,8 @@ if (BUILD_TESTING)
   add_executable(acs_km_insertion_heuristic_test cpp/tests/test_insertion_heuristic.cpp)
   target_link_libraries(acs_km_insertion_heuristic_test PRIVATE acs_km_core)
   add_test(NAME acs_km_insertion_heuristic_test COMMAND acs_km_insertion_heuristic_test)
+
+  add_executable(acs_km_ants_core_test cpp/tests/test_ants_core.cpp)
+  target_link_libraries(acs_km_ants_core_test PRIVATE acs_km_core)
+  add_test(NAME acs_km_ants_core_test COMMAND acs_km_ants_core_test)
 endif()
