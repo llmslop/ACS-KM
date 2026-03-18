@@ -22,7 +22,7 @@ struct NearestNeighborLists {
 
 [[nodiscard]] double dtrunc(double value);
 
-[[nodiscard]] double euclidian_distance(const std::vector<Point>& nodes, int i, int j);
+[[nodiscard]] double euclidean_distance(const std::vector<Point>& nodes, int i, int j);
 [[nodiscard]] int ceil_distance(const std::vector<Point>& nodes, int i, int j);
 [[nodiscard]] int geo_distance(const std::vector<Point>& nodes, int i, int j);
 [[nodiscard]] int att_distance(const std::vector<Point>& nodes, int i, int j);

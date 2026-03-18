@@ -13,14 +13,14 @@ double dtrunc(const double value) {
     return static_cast<double>(static_cast<int>(value));
 }
 
-double euclidian_distance(const std::vector<Point>& nodes, const int i, const int j) {
+double euclidean_distance(const std::vector<Point>& nodes, const int i, const int j) {
     const auto xd = static_cast<double>(nodes[i].x - nodes[j].x);
     const auto yd = static_cast<double>(nodes[i].y - nodes[j].y);
     return std::sqrt(xd * xd + yd * yd);
 }
 
 int ceil_distance(const std::vector<Point>& nodes, const int i, const int j) {
-    return static_cast<int>(std::ceil(euclidian_distance(nodes, i, j)));
+    return static_cast<int>(std::ceil(euclidean_distance(nodes, i, j)));
 }
 
 int geo_distance(const std::vector<Point>& nodes, const int i, const int j) {
@@ -82,7 +82,7 @@ std::vector<std::vector<double>> compute_distances(const std::vector<Point>& nod
                         static_cast<int>(j)));
                     break;
                 case DistanceType::euc_2d:
-                    matrix[i][j] = euclidian_distance(
+                    matrix[i][j] = euclidean_distance(
                         nodes,
                         static_cast<int>(i),
                         static_cast<int>(j));
