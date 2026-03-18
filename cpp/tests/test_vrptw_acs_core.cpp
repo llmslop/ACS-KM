@@ -20,6 +20,11 @@ acs_km::InstanceData make_instance() {
         {2, 0, 1},
         {3, 1, 0},
     };
+    data.problem.nn_list = {
+        {1, 2},
+        {2, 0},
+        {1, 0},
+    };
     data.requests = {
         {.id = 0, .demand = 0, .start_window = 0, .end_window = 100, .service_time = 0},
         {.id = 1, .demand = 3, .start_window = 0, .end_window = 100, .service_time = 1},
@@ -201,6 +206,79 @@ void test_construct_solutions() {
     expect(ants.ants[0].total_tour_length > 0.0, "Expected positive total length for constructed solution");
 }
 
+void test_probabilistic_selectors_and_local_search() {
+    auto instance = make_instance();
+    instance.available_request_ids = {0, 1};
+    instance.problem.nn_list = {
+        {1, 2},
+        {2, 0},
+        {1, 0},
+    };
+
+    acs_km::AntAlgorithmState ants;
+    ants.q_0 = 1.0;
+    ants.nn_ants = 2;
+    ants.alpha = 1.0;
+    ants.beta = 1.0;
+    ants.pheromone = {
+        {1.0, 1.0, 1.0},
+        {1.0, 1.0, 1.0},
+        {1.0, 1.0, 1.0},
+    };
+    ants.best_so_far_ant.used_vehicles = 1;
+    ants.best_so_far_ant.tours = {{-1, -1}};
+    ants.best_so_far_ant.total_tour_length = 100.0;
+    ants.committed_nodes = {false, false};
+
+    acs_km::AntSolution ant;
+    ant.used_vehicles = 1;
+    ant.tours = {{-1}};
+    ant.tour_lengths = {0.0};
+    ant.current_quantity = {0.0};
+    ant.current_time = {0.0};
+    ant.begin_service = {0.0, 0.0, 0.0};
+    ant.visited = {false, false};
+    ant.to_visit = 2;
+
+    const auto move = acs_km::neighbour_choose_and_move_to_next(ant, instance, ants);
+    expect(move.salesman == 0, "Expected move assigned to first salesman");
+    expect(ant.to_visit == 1, "Expected one customer to be visited by selector");
+
+    acs_km::AntSolution ls_ant;
+    ls_ant.tours = {{-1, 0, -1}, {-1, 1, -1}};
+    ls_ant.used_vehicles = 2;
+    ls_ant.current_quantity = {3.0, 3.0};
+    ls_ant.current_time = {0.0, 0.0};
+    ls_ant.begin_service = {0.0, 2.0, 3.0};
+    ls_ant.tour_lengths = {4.0, 6.0};
+    ls_ant.total_tour_length = 10.0;
+
+    auto improved = acs_km::relocate_multiple_route_iterated(ls_ant, instance, ants);
+    improved = acs_km::exchange_multiple_route_iterated(improved, instance, ants);
+    expect(improved.used_vehicles >= 1, "Expected local search result to keep valid vehicle count");
+}
+
+void test_run_colony_iterations() {
+    auto instance = make_instance();
+    instance.available_request_ids = {0, 1};
+    instance.problem.nn_list = {
+        {1, 2},
+        {2, 0},
+        {1, 0},
+    };
+    acs_km::AntAlgorithmState ants;
+    ants.n_ants = 1;
+    ants.acs_flag = true;
+    ants.nn_ants = 2;
+    ants.ants = {acs_km::AntSolution{}};
+    acs_km::allocate_ants(ants, instance);
+    acs_km::InOutState inout;
+    acs_km::init_try(instance, ants, inout);
+
+    acs_km::run_colony_iterations(instance, ants, inout, 2);
+    expect(inout.no_evaluations == 2, "Expected run_colony_iterations to account all evaluations");
+}
+
 }  // namespace
 
 int main() {
@@ -213,6 +291,8 @@ int main() {
         test_pheromone_trail_update_orchestration();
         test_init_try_and_update_statistics();
         test_construct_solutions();
+        test_probabilistic_selectors_and_local_search();
+        test_run_colony_iterations();
         std::cout << "All vrptw_acs core tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& ex) {
