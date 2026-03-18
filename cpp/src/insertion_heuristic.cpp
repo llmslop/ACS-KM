@@ -6,6 +6,13 @@
 
 namespace acs_km {
 
+namespace {
+constexpr double kInsertionMu = 1.0;
+constexpr double kInsertionAlpha1 = 0.1;
+constexpr double kInsertionAlpha2 = 0.9;
+constexpr double kInsertionLambda = 2.0;
+}  // namespace
+
 void compute_route_variables(AntSolution& ant, const InstanceData& vrp, const int start_tour_index) {
     const auto& req = vrp.requests;
 
@@ -98,7 +105,7 @@ bool check_is_feasible_tour(const AntSolution& ant,
                             const InstanceData& vrp,
                             const int customer,
                             const int index_tour,
-                            const int /*previous_pos*/,
+                            [[maybe_unused]] const int previous_pos,
                             const int next_pos) {
     const auto& req = vrp.requests;
     auto current_quantity = req[0].demand;
@@ -179,10 +186,6 @@ void insert_unrouted_customers(AntSolution& ant,
                                const std::vector<int>& start_pos) {
     const auto& req = vrp.requests;
     auto ok = true;
-    constexpr auto mu = 1.0;
-    constexpr auto alfa1 = 0.1;
-    constexpr auto alfa2 = 0.9;
-    constexpr auto lambda = 2.0;
     std::unordered_map<int, bool> visited;
     for (const auto node : unvisited_nodes) {
         visited[node] = false;
@@ -213,7 +216,7 @@ void insert_unrouted_customers(AntSolution& ant,
                         const auto next_city = ant.tours[static_cast<std::size_t>(index_tour)][pos];
                         const auto c11 = vrp.problem.distance[static_cast<std::size_t>(previous_city + 1)][static_cast<std::size_t>(customer + 1)] +
                                          vrp.problem.distance[static_cast<std::size_t>(customer + 1)][static_cast<std::size_t>(next_city + 1)] -
-                                         mu * vrp.problem.distance[static_cast<std::size_t>(previous_city + 1)][static_cast<std::size_t>(next_city + 1)];
+                                         kInsertionMu * vrp.problem.distance[static_cast<std::size_t>(previous_city + 1)][static_cast<std::size_t>(next_city + 1)];
                         const auto arrival_time = ant.begin_service[static_cast<std::size_t>(previous_city + 1)] +
                                                   req[static_cast<std::size_t>(previous_city + 1)].service_time +
                                                   vrp.problem.distance[static_cast<std::size_t>(previous_city + 1)][static_cast<std::size_t>(customer + 1)];
@@ -223,7 +226,7 @@ void insert_unrouted_customers(AntSolution& ant,
                         const auto new_begin_service = std::max(new_arrival_time, req[static_cast<std::size_t>(next_city + 1)].start_window);
                         const auto old_begin_service = ant.begin_service[static_cast<std::size_t>(next_city + 1)];
                         const auto c12 = new_begin_service - old_begin_service;
-                        const auto c1 = alfa1 * c11 + alfa2 * c12;
+                        const auto c1 = kInsertionAlpha1 * c11 + kInsertionAlpha2 * c12;
                         if (c1 < best_c1_score) {
                             best_c1_score = c1;
                             best_index_tour = index_tour;
@@ -246,7 +249,7 @@ void insert_unrouted_customers(AntSolution& ant,
         auto best_index_insertion = -1;
         for (std::size_t i = 0; i < best_insertions.size(); ++i) {
             const auto& insert = best_insertions[i];
-            const auto c2 = lambda * vrp.problem.distance[0][static_cast<std::size_t>(insert.customer + 1)] - insert.score;
+            const auto c2 = kInsertionLambda * vrp.problem.distance[0][static_cast<std::size_t>(insert.customer + 1)] - insert.score;
             if (c2 < best_c2_score) {
                 best_c2_score = c2;
                 best_index_insertion = static_cast<int>(i);

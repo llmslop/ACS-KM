@@ -24,7 +24,7 @@ void test_sort2() {
 
 void test_random01_bounds() {
     acs_km::UtilitiesCore utils(123U);
-    for (auto i = 0; i < 100; ++i) {
+    for (auto trial = 0; trial < 100; ++trial) {
         const auto x = utils.random01();
         expect(x >= 0.0 && x <= 1.0, "Expected random01 output in [0, 1]");
     }

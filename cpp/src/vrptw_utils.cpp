@@ -30,18 +30,18 @@ int geo_distance(const std::vector<Point>& nodes, const int i, const int j) {
     const auto y2 = static_cast<double>(nodes[j].y);
 
     auto deg = dtrunc(x1);
-    auto min = x1 - deg;
-    const auto lati = std::numbers::pi * (deg + 5.0 * min / 3.0) / 180.0;
+    auto fractional_part = x1 - deg;
+    const auto lati = std::numbers::pi * (deg + 5.0 * fractional_part / 3.0) / 180.0;
     deg = dtrunc(x2);
-    min = x2 - deg;
-    const auto latj = std::numbers::pi * (deg + 5.0 * min / 3.0) / 180.0;
+    fractional_part = x2 - deg;
+    const auto latj = std::numbers::pi * (deg + 5.0 * fractional_part / 3.0) / 180.0;
 
     deg = dtrunc(y1);
-    min = y1 - deg;
-    const auto longi = std::numbers::pi * (deg + 5.0 * min / 3.0) / 180.0;
+    fractional_part = y1 - deg;
+    const auto longi = std::numbers::pi * (deg + 5.0 * fractional_part / 3.0) / 180.0;
     deg = dtrunc(y2);
-    min = y2 - deg;
-    const auto longj = std::numbers::pi * (deg + 5.0 * min / 3.0) / 180.0;
+    fractional_part = y2 - deg;
+    const auto longj = std::numbers::pi * (deg + 5.0 * fractional_part / 3.0) / 180.0;
 
     const auto q1 = std::cos(longi - longj);
     const auto q2 = std::cos(lati - latj);
