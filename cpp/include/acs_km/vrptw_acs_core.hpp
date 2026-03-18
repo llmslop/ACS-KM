@@ -22,6 +22,30 @@ void generate_initial_weights(AntAlgorithmState& ants, UtilitiesCore& random_sou
 [[nodiscard]] int find_shortest_tour(const AntSolution& ant);
 [[nodiscard]] int calc_tour_dist(const std::vector<int>& tour, const InstanceData& vrp);
 [[nodiscard]] bool is_better_solution(const AntSolution& candidate, const AntSolution& incumbent);
+[[nodiscard]] bool check_feasible_tour_relocation_multiple(const AntSolution& ant,
+                                                           const InstanceData& vrp,
+                                                           int index_tour_source,
+                                                           int index_tour_destination,
+                                                           int i,
+                                                           int j);
+void update_begin_service_relocation_multiple(AntSolution& ant,
+                                              const InstanceData& vrp,
+                                              int index_tour_source,
+                                              int index_tour_destination,
+                                              int i,
+                                              int j);
+[[nodiscard]] bool check_feasible_tour_exchange_multiple(const AntSolution& ant,
+                                                         const InstanceData& vrp,
+                                                         int index_tour_source,
+                                                         int index_tour_destination,
+                                                         int i,
+                                                         int j);
+void update_begin_service_exchange_multiple(AntSolution& ant,
+                                            const InstanceData& vrp,
+                                            int index_tour_source,
+                                            int index_tour_destination,
+                                            int i,
+                                            int j);
 
 void add_committed_nodes(AntSolution& ant,
                          const AntAlgorithmState& ants,

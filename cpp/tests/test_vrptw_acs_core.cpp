@@ -106,6 +106,27 @@ void test_shortest_tour_and_calc_dist_and_compare() {
     expect(acs_km::is_better_solution(candidate, incumbent), "Expected fewer vehicles to dominate");
 }
 
+void test_relocation_and_exchange_helpers() {
+    auto instance = make_instance();
+    acs_km::AntSolution ant;
+    ant.tours = {{-1, 0, -1}, {-1, 1, -1}};
+    ant.used_vehicles = 2;
+    ant.current_quantity = {3.0, 3.0};
+    ant.current_time = {0.0, 0.0};
+    ant.begin_service = {0.0, 2.0, 3.0};
+
+    expect(acs_km::check_feasible_tour_relocation_multiple(ant, instance, 0, 1, 1, 1),
+           "Expected relocation feasibility");
+    expect(acs_km::check_feasible_tour_exchange_multiple(ant, instance, 0, 1, 1, 1),
+           "Expected exchange feasibility");
+
+    acs_km::update_begin_service_relocation_multiple(ant, instance, 0, 1, 1, 1);
+    expect(ant.current_time[0] >= 0.0 && ant.current_time[1] >= 0.0, "Expected relocation begin-service update");
+
+    acs_km::update_begin_service_exchange_multiple(ant, instance, 0, 1, 1, 1);
+    expect(ant.current_time[0] >= 0.0 && ant.current_time[1] >= 0.0, "Expected exchange begin-service update");
+}
+
 }  // namespace
 
 int main() {
@@ -114,6 +135,7 @@ int main() {
         test_is_done_and_feasible();
         test_committed_tours_and_add_nodes();
         test_shortest_tour_and_calc_dist_and_compare();
+        test_relocation_and_exchange_helpers();
         std::cout << "All vrptw_acs core tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& ex) {

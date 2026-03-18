@@ -120,6 +120,226 @@ bool is_better_solution(const AntSolution& candidate, const AntSolution& incumbe
            ((round1 < round2) && (incumbent.total_tour_length == std::numeric_limits<double>::max()));
 }
 
+bool check_feasible_tour_relocation_multiple(const AntSolution& ant,
+                                             const InstanceData& vrp,
+                                             const int index_tour_source,
+                                             const int index_tour_destination,
+                                             const int i,
+                                             const int j) {
+    const auto& req_list = vrp.requests;
+
+    const auto city = ant.tours[static_cast<std::size_t>(index_tour_source)][static_cast<std::size_t>(i)];
+    auto current_quantity = ant.current_quantity[static_cast<std::size_t>(index_tour_destination)] +
+                            req_list[static_cast<std::size_t>(city + 1)].demand;
+    if (current_quantity > vrp.problem.capacity) {
+        return false;
+    }
+
+    auto current_time = 0.0;
+    for (int pos = i + 1; pos < static_cast<int>(ant.tours[static_cast<std::size_t>(index_tour_source)].size()); ++pos) {
+        auto prev_city = 0;
+        auto current_city = 0;
+        if (pos == (i + 1)) {
+            prev_city = ant.tours[static_cast<std::size_t>(index_tour_source)][static_cast<std::size_t>(pos - 2)];
+            current_city = ant.tours[static_cast<std::size_t>(index_tour_source)][static_cast<std::size_t>(pos)];
+            current_time = ant.begin_service[static_cast<std::size_t>(prev_city + 1)];
+        } else {
+            prev_city = ant.tours[static_cast<std::size_t>(index_tour_source)][static_cast<std::size_t>(pos - 1)];
+            current_city = ant.tours[static_cast<std::size_t>(index_tour_source)][static_cast<std::size_t>(pos)];
+        }
+        const auto distance = vrp.problem.distance[static_cast<std::size_t>(prev_city + 1)][static_cast<std::size_t>(current_city + 1)];
+        const auto arrival_time = current_time + req_list[static_cast<std::size_t>(prev_city + 1)].service_time + distance;
+        const auto begin_service = std::max(arrival_time, req_list[static_cast<std::size_t>(current_city + 1)].start_window);
+        if (begin_service > req_list[static_cast<std::size_t>(current_city + 1)].end_window) {
+            return false;
+        }
+        current_time = begin_service;
+    }
+
+    const auto previous_city = ant.tours[static_cast<std::size_t>(index_tour_destination)][static_cast<std::size_t>(j - 1)];
+    const auto next_city = ant.tours[static_cast<std::size_t>(index_tour_destination)][static_cast<std::size_t>(j)];
+    auto arrival_time = ant.begin_service[static_cast<std::size_t>(previous_city + 1)] +
+                        req_list[static_cast<std::size_t>(previous_city + 1)].service_time +
+                        vrp.problem.distance[static_cast<std::size_t>(previous_city + 1)][static_cast<std::size_t>(city + 1)];
+    auto begin_service = std::max(arrival_time, req_list[static_cast<std::size_t>(city + 1)].start_window);
+    if (begin_service > req_list[static_cast<std::size_t>(city + 1)].end_window) {
+        return false;
+    }
+    current_time = begin_service;
+
+    arrival_time = current_time + req_list[static_cast<std::size_t>(city + 1)].service_time +
+                   vrp.problem.distance[static_cast<std::size_t>(city + 1)][static_cast<std::size_t>(next_city + 1)];
+    begin_service = std::max(arrival_time, req_list[static_cast<std::size_t>(next_city + 1)].start_window);
+    if (begin_service > req_list[static_cast<std::size_t>(next_city + 1)].end_window) {
+        return false;
+    }
+    current_time = begin_service;
+
+    for (int pos = j + 1; pos < static_cast<int>(ant.tours[static_cast<std::size_t>(index_tour_destination)].size()); ++pos) {
+        const auto prev_city = ant.tours[static_cast<std::size_t>(index_tour_destination)][static_cast<std::size_t>(pos - 1)];
+        const auto current_city = ant.tours[static_cast<std::size_t>(index_tour_destination)][static_cast<std::size_t>(pos)];
+        const auto distance = vrp.problem.distance[static_cast<std::size_t>(prev_city + 1)][static_cast<std::size_t>(current_city + 1)];
+        arrival_time = current_time + req_list[static_cast<std::size_t>(prev_city + 1)].service_time + distance;
+        begin_service = std::max(arrival_time, req_list[static_cast<std::size_t>(current_city + 1)].start_window);
+        if (begin_service > req_list[static_cast<std::size_t>(current_city + 1)].end_window) {
+            return false;
+        }
+        current_time = begin_service;
+    }
+
+    return true;
+}
+
+void update_begin_service_relocation_multiple(AntSolution& ant,
+                                              const InstanceData& vrp,
+                                              const int index_tour_source,
+                                              const int index_tour_destination,
+                                              const int i,
+                                              const int j) {
+    const auto& req_list = vrp.requests;
+    auto current_time = 0.0;
+    auto begin_service = 0.0;
+
+    for (int pos = i; pos < static_cast<int>(ant.tours[static_cast<std::size_t>(index_tour_source)].size()) - 1; ++pos) {
+        const auto prev_city = ant.tours[static_cast<std::size_t>(index_tour_source)][static_cast<std::size_t>(pos - 1)];
+        const auto current_city = ant.tours[static_cast<std::size_t>(index_tour_source)][static_cast<std::size_t>(pos)];
+        if (pos == i) {
+            current_time = ant.begin_service[static_cast<std::size_t>(prev_city + 1)];
+        }
+        const auto distance = vrp.problem.distance[static_cast<std::size_t>(prev_city + 1)][static_cast<std::size_t>(current_city + 1)];
+        const auto arrival_time = current_time + req_list[static_cast<std::size_t>(prev_city + 1)].service_time + distance;
+        begin_service = std::max(arrival_time, req_list[static_cast<std::size_t>(current_city + 1)].start_window);
+        current_time = begin_service;
+        ant.begin_service[static_cast<std::size_t>(current_city + 1)] = begin_service;
+    }
+    ant.current_time[static_cast<std::size_t>(index_tour_source)] = begin_service;
+
+    for (int pos = j; pos < static_cast<int>(ant.tours[static_cast<std::size_t>(index_tour_destination)].size()) - 1; ++pos) {
+        const auto prev_city = ant.tours[static_cast<std::size_t>(index_tour_destination)][static_cast<std::size_t>(pos - 1)];
+        const auto current_city = ant.tours[static_cast<std::size_t>(index_tour_destination)][static_cast<std::size_t>(pos)];
+        if (pos == j) {
+            current_time = ant.begin_service[static_cast<std::size_t>(prev_city + 1)];
+        }
+        const auto distance = vrp.problem.distance[static_cast<std::size_t>(prev_city + 1)][static_cast<std::size_t>(current_city + 1)];
+        const auto arrival_time = current_time + req_list[static_cast<std::size_t>(prev_city + 1)].service_time + distance;
+        begin_service = std::max(arrival_time, req_list[static_cast<std::size_t>(current_city + 1)].start_window);
+        current_time = begin_service;
+        ant.begin_service[static_cast<std::size_t>(current_city + 1)] = begin_service;
+    }
+    ant.current_time[static_cast<std::size_t>(index_tour_destination)] = begin_service;
+}
+
+bool check_feasible_tour_exchange_multiple(const AntSolution& ant,
+                                           const InstanceData& vrp,
+                                           const int index_tour_source,
+                                           const int index_tour_destination,
+                                           const int i,
+                                           const int j) {
+    const auto& req_list = vrp.requests;
+    const auto city1 = ant.tours[static_cast<std::size_t>(index_tour_source)][static_cast<std::size_t>(i)];
+    const auto city2 = ant.tours[static_cast<std::size_t>(index_tour_destination)][static_cast<std::size_t>(j)];
+    auto current_quantity = ant.current_quantity[static_cast<std::size_t>(index_tour_source)] -
+                            req_list[static_cast<std::size_t>(city1 + 1)].demand +
+                            req_list[static_cast<std::size_t>(city2 + 1)].demand;
+    if (current_quantity > vrp.problem.capacity) {
+        return false;
+    }
+    current_quantity = ant.current_quantity[static_cast<std::size_t>(index_tour_destination)] -
+                       req_list[static_cast<std::size_t>(city2 + 1)].demand +
+                       req_list[static_cast<std::size_t>(city1 + 1)].demand;
+    if (current_quantity > vrp.problem.capacity) {
+        return false;
+    }
+
+    auto current_time = 0.0;
+    for (int pos = i; pos < static_cast<int>(ant.tours[static_cast<std::size_t>(index_tour_source)].size()); ++pos) {
+        auto prev_city = 0;
+        auto current_city = 0;
+        if (pos == i) {
+            prev_city = ant.tours[static_cast<std::size_t>(index_tour_source)][static_cast<std::size_t>(pos - 1)];
+            current_city = ant.tours[static_cast<std::size_t>(index_tour_destination)][static_cast<std::size_t>(j)];
+            current_time = ant.begin_service[static_cast<std::size_t>(prev_city + 1)];
+        } else if (pos == (i + 1)) {
+            prev_city = ant.tours[static_cast<std::size_t>(index_tour_destination)][static_cast<std::size_t>(j)];
+            current_city = ant.tours[static_cast<std::size_t>(index_tour_source)][static_cast<std::size_t>(pos)];
+        } else {
+            prev_city = ant.tours[static_cast<std::size_t>(index_tour_source)][static_cast<std::size_t>(pos - 1)];
+            current_city = ant.tours[static_cast<std::size_t>(index_tour_source)][static_cast<std::size_t>(pos)];
+        }
+        const auto distance = vrp.problem.distance[static_cast<std::size_t>(prev_city + 1)][static_cast<std::size_t>(current_city + 1)];
+        const auto arrival_time = current_time + req_list[static_cast<std::size_t>(prev_city + 1)].service_time + distance;
+        const auto begin_service = std::max(arrival_time, req_list[static_cast<std::size_t>(current_city + 1)].start_window);
+        if (begin_service > req_list[static_cast<std::size_t>(current_city + 1)].end_window) {
+            return false;
+        }
+        current_time = begin_service;
+    }
+
+    for (int pos = j; pos < static_cast<int>(ant.tours[static_cast<std::size_t>(index_tour_destination)].size()); ++pos) {
+        auto prev_city = 0;
+        auto current_city = 0;
+        if (pos == j) {
+            prev_city = ant.tours[static_cast<std::size_t>(index_tour_destination)][static_cast<std::size_t>(pos - 1)];
+            current_city = ant.tours[static_cast<std::size_t>(index_tour_source)][static_cast<std::size_t>(i)];
+            current_time = ant.begin_service[static_cast<std::size_t>(prev_city + 1)];
+        } else if (pos == (j + 1)) {
+            prev_city = ant.tours[static_cast<std::size_t>(index_tour_source)][static_cast<std::size_t>(i)];
+            current_city = ant.tours[static_cast<std::size_t>(index_tour_destination)][static_cast<std::size_t>(pos)];
+        } else {
+            prev_city = ant.tours[static_cast<std::size_t>(index_tour_destination)][static_cast<std::size_t>(pos - 1)];
+            current_city = ant.tours[static_cast<std::size_t>(index_tour_destination)][static_cast<std::size_t>(pos)];
+        }
+        const auto distance = vrp.problem.distance[static_cast<std::size_t>(prev_city + 1)][static_cast<std::size_t>(current_city + 1)];
+        const auto arrival_time = current_time + req_list[static_cast<std::size_t>(prev_city + 1)].service_time + distance;
+        const auto begin_service = std::max(arrival_time, req_list[static_cast<std::size_t>(current_city + 1)].start_window);
+        if (begin_service > req_list[static_cast<std::size_t>(current_city + 1)].end_window) {
+            return false;
+        }
+        current_time = begin_service;
+    }
+
+    return true;
+}
+
+void update_begin_service_exchange_multiple(AntSolution& ant,
+                                            const InstanceData& vrp,
+                                            const int index_tour_source,
+                                            const int index_tour_destination,
+                                            const int i,
+                                            const int j) {
+    const auto& req_list = vrp.requests;
+    auto current_time = 0.0;
+    auto begin_service = 0.0;
+
+    for (int pos = i; pos < static_cast<int>(ant.tours[static_cast<std::size_t>(index_tour_source)].size()) - 1; ++pos) {
+        const auto prev_city = ant.tours[static_cast<std::size_t>(index_tour_source)][static_cast<std::size_t>(pos - 1)];
+        const auto current_city = ant.tours[static_cast<std::size_t>(index_tour_source)][static_cast<std::size_t>(pos)];
+        if (pos == i) {
+            current_time = ant.begin_service[static_cast<std::size_t>(prev_city + 1)];
+        }
+        const auto distance = vrp.problem.distance[static_cast<std::size_t>(prev_city + 1)][static_cast<std::size_t>(current_city + 1)];
+        const auto arrival_time = current_time + req_list[static_cast<std::size_t>(prev_city + 1)].service_time + distance;
+        begin_service = std::max(arrival_time, req_list[static_cast<std::size_t>(current_city + 1)].start_window);
+        current_time = begin_service;
+        ant.begin_service[static_cast<std::size_t>(current_city + 1)] = begin_service;
+    }
+    ant.current_time[static_cast<std::size_t>(index_tour_source)] = begin_service;
+
+    for (int pos = j; pos < static_cast<int>(ant.tours[static_cast<std::size_t>(index_tour_destination)].size()) - 1; ++pos) {
+        const auto prev_city = ant.tours[static_cast<std::size_t>(index_tour_destination)][static_cast<std::size_t>(pos - 1)];
+        const auto current_city = ant.tours[static_cast<std::size_t>(index_tour_destination)][static_cast<std::size_t>(pos)];
+        if (pos == j) {
+            current_time = ant.begin_service[static_cast<std::size_t>(prev_city + 1)];
+        }
+        const auto distance = vrp.problem.distance[static_cast<std::size_t>(prev_city + 1)][static_cast<std::size_t>(current_city + 1)];
+        const auto arrival_time = current_time + req_list[static_cast<std::size_t>(prev_city + 1)].service_time + distance;
+        begin_service = std::max(arrival_time, req_list[static_cast<std::size_t>(current_city + 1)].start_window);
+        current_time = begin_service;
+        ant.begin_service[static_cast<std::size_t>(current_city + 1)] = begin_service;
+    }
+    ant.current_time[static_cast<std::size_t>(index_tour_destination)] = begin_service;
+}
+
 void add_committed_nodes(AntSolution& ant,
                          const AntAlgorithmState& ants,
                          const InstanceData& instance) {
