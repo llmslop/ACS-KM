@@ -9,8 +9,12 @@
 
 namespace {
 
+std::filesystem::path default_input_path() {
+    return std::filesystem::path("input") / "rc203-0.5.txt";
+}
+
 struct CliOptions {
-    std::filesystem::path input_path{std::filesystem::path("input") / "rc203-0.5.txt"};
+    std::filesystem::path input_path{default_input_path()};
     bool show_help{false};
     bool simulate_slices{false};
     double working_day_seconds{100.0};
@@ -18,7 +22,9 @@ struct CliOptions {
 };
 
 std::string usage_message() {
-    return "Usage: acs_km_cli [--input /absolute/or/relative/path/to/file.txt] [--simulate-slices] "
+    return "Load an ACS-KM instance and optionally simulate dynamic request release.\n"
+           "Default input: " + default_input_path().string() + "\n"
+           "Usage: acs_km_cli [--input /absolute/or/relative/path/to/file.txt] [--simulate-slices] "
            "[--working-day positive_seconds] [--time-slices positive_count] [--help|-h]";
 }
 
@@ -83,7 +89,7 @@ CliOptions parse_options(int argc, char** argv) {
             continue;
         }
 
-        throw std::runtime_error(usage_message());
+        throw std::runtime_error("Unrecognized option: " + arg + "\n" + usage_message());
     }
 
     return options;
