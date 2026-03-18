@@ -138,6 +138,21 @@ void test_dynamic_instance() {
            "Expected dynamic + available + depot partition to match total requests");
 }
 
+void test_commit_nodes_flow() {
+    acs_km::AntAlgorithmState ants;
+    ants.committed_nodes = {false, false, false};
+    ants.best_so_far_ant.used_vehicles = 1;
+    ants.best_so_far_ant.tours = {{-1, 0, 1, 2, -1}};
+    ants.best_so_far_ant.begin_service = {0.0, 5.0, 20.0, 40.0};
+
+    const auto has_new = acs_km::check_new_committed_nodes(ants, ants.best_so_far_ant, 1, 10.0);
+    expect(has_new, "Expected new commit candidate at first time slice");
+
+    acs_km::commit_nodes(ants, ants.best_so_far_ant, 1, 10.0);
+    expect(ants.committed_nodes[0], "Expected node 0 committed");
+    expect(!ants.committed_nodes[1], "Expected node 1 not committed at first time slice");
+}
+
 }  // namespace
 
 int main() {
@@ -149,6 +164,7 @@ int main() {
         test_simulate_dynamic_release_custom_config();
         test_simulate_dynamic_release_invalid_config();
         test_simulate_dynamic_release_no_dynamic_requests();
+        test_commit_nodes_flow();
         std::cout << "All data reader tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& ex) {

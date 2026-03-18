@@ -9,6 +9,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_library(acs_km_core
     cpp/src/data_reader.cpp
     cpp/src/inout.cpp
+    cpp/src/insertion_heuristic.cpp
     cpp/src/km_match.cpp
     cpp/src/parse.cpp
     cpp/src/vrptw_utils.cpp
@@ -50,4 +51,8 @@ if (BUILD_TESTING)
   add_executable(acs_km_parse_inout_test cpp/tests/test_parse_inout.cpp)
   target_link_libraries(acs_km_parse_inout_test PRIVATE acs_km_core)
   add_test(NAME acs_km_parse_inout_test COMMAND acs_km_parse_inout_test)
+
+  add_executable(acs_km_insertion_heuristic_test cpp/tests/test_insertion_heuristic.cpp)
+  target_link_libraries(acs_km_insertion_heuristic_test PRIVATE acs_km_core)
+  add_test(NAME acs_km_insertion_heuristic_test COMMAND acs_km_insertion_heuristic_test)
 endif()
