@@ -120,6 +120,27 @@ bool is_better_solution(const AntSolution& candidate, const AntSolution& incumbe
            ((round1 < round2) && (incumbent.total_tour_length == std::numeric_limits<double>::max()));
 }
 
+void as_update(AntAlgorithmState& ants) {
+    for (const auto& ant : ants.ants) {
+        global_update_pheromone(ants, ant);
+    }
+}
+
+void acs_global_update(AntAlgorithmState& ants) {
+    global_acs_pheromone_update(ants, ants.best_so_far_ant);
+}
+
+void pheromone_trail_update(AntAlgorithmState& ants, const int customer_count) {
+    if (ants.as_flag) {
+        evaporation(ants, customer_count);
+    }
+    if (ants.as_flag) {
+        as_update(ants);
+    } else if (ants.acs_flag) {
+        acs_global_update(ants);
+    }
+}
+
 bool check_feasible_tour_relocation_multiple(const AntSolution& ant,
                                              const InstanceData& vrp,
                                              const int index_tour_source,

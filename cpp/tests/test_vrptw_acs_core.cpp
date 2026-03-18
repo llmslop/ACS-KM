@@ -127,6 +127,28 @@ void test_relocation_and_exchange_helpers() {
     expect(ant.current_time[0] >= 0.0 && ant.current_time[1] >= 0.0, "Expected exchange begin-service update");
 }
 
+void test_pheromone_trail_update_orchestration() {
+    acs_km::AntAlgorithmState ants;
+    ants.rho = 0.1;
+    ants.trail_0 = 1.0;
+    ants.as_flag = true;
+    acs_km::AntSolution one_ant;
+    one_ant.used_vehicles = 1;
+    one_ant.tours = {{-1, 0, -1}};
+    one_ant.total_tour_length = 4.0;
+    ants.ants = {one_ant};
+    acs_km::init_pheromone_trails(ants, 1, 1.0);
+    acs_km::pheromone_trail_update(ants, 1);
+    expect(ants.pheromone[0][1] > 0.0, "Expected AS trail update to keep positive pheromone");
+
+    ants.as_flag = false;
+    ants.acs_flag = true;
+    ants.best_so_far_ant = ants.ants[0];
+    const auto before = ants.pheromone[0][1];
+    acs_km::pheromone_trail_update(ants, 1);
+    expect(ants.pheromone[0][1] != before, "Expected ACS trail update to modify pheromone");
+}
+
 }  // namespace
 
 int main() {
@@ -136,6 +158,7 @@ int main() {
         test_committed_tours_and_add_nodes();
         test_shortest_tour_and_calc_dist_and_compare();
         test_relocation_and_exchange_helpers();
+        test_pheromone_trail_update_orchestration();
         std::cout << "All vrptw_acs core tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& ex) {
