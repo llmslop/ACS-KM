@@ -34,11 +34,15 @@ struct AntAlgorithmState {
     bool as_flag{false};
     bool acs_flag{false};
     bool acs_km_flag{false};
+    double initial_weight1{0.0};
+    double initial_weight2{0.0};
+    double initial_weight3{0.0};
     int u_gb{2147483647};
     double trail_0{0.0};
 
     std::vector<std::vector<double>> pheromone;
     std::vector<bool> committed_nodes;
+    std::vector<AntSolution> ants;
     AntSolution best_so_far_ant;
 };
 

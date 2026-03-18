@@ -14,6 +14,7 @@ add_library(acs_km_core
     cpp/src/km_match.cpp
     cpp/src/parse.cpp
     cpp/src/utilities_core.cpp
+    cpp/src/vrptw_acs_core.cpp
     cpp/src/vrptw_utils.cpp
 )
 
@@ -65,4 +66,8 @@ if (BUILD_TESTING)
   add_executable(acs_km_utilities_core_test cpp/tests/test_utilities_core.cpp)
   target_link_libraries(acs_km_utilities_core_test PRIVATE acs_km_core)
   add_test(NAME acs_km_utilities_core_test COMMAND acs_km_utilities_core_test)
+
+  add_executable(acs_km_vrptw_acs_core_test cpp/tests/test_vrptw_acs_core.cpp)
+  target_link_libraries(acs_km_vrptw_acs_core_test PRIVATE acs_km_core)
+  add_test(NAME acs_km_vrptw_acs_core_test COMMAND acs_km_vrptw_acs_core_test)
 endif()
