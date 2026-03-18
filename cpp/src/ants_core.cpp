@@ -30,6 +30,7 @@ void allocate_ants(AntAlgorithmState& ants, const InstanceData& instance) {
     ants.best_so_far_ant.cost_objectives = {0.0, 0.0};
     ants.best_so_far_ant.earliest_time = {{}};
     ants.best_so_far_ant.latest_time = {{}};
+    ants.restart_best_ant = ants.best_so_far_ant;
 }
 
 int find_best(const std::vector<AntSolution>& population) {

@@ -44,6 +44,7 @@ struct AntAlgorithmState {
     std::vector<bool> committed_nodes;
     std::vector<AntSolution> ants;
     AntSolution best_so_far_ant;
+    AntSolution restart_best_ant;
 };
 
 }  // namespace acs_km

@@ -149,6 +149,41 @@ void test_pheromone_trail_update_orchestration() {
     expect(ants.pheromone[0][1] != before, "Expected ACS trail update to modify pheromone");
 }
 
+void test_init_try_and_update_statistics() {
+    auto instance = make_instance();
+    instance.available_request_ids = {0, 1};
+
+    acs_km::AntAlgorithmState ants;
+    ants.ants = {acs_km::AntSolution{}, acs_km::AntSolution{}};
+    ants.rho = 0.5;
+    ants.acs_flag = false;
+    acs_km::InOutState inout;
+
+    acs_km::init_try(instance, ants, inout);
+    expect(inout.iteration == 1, "Expected init_try to set iteration");
+    expect(ants.trail_0 > 0.0, "Expected positive initial trail");
+    expect(!ants.pheromone.empty(), "Expected initialized pheromone matrix");
+
+    ants.ants[0].used_vehicles = 2;
+    ants.ants[0].total_tour_length = 100.0;
+    ants.ants[0].cost_objectives = {100.0, 0.0};
+    ants.ants[1].used_vehicles = 0;
+    ants.ants[1].total_tour_length = 90.0;
+    ants.ants[1].cost_objectives = {90.0, 0.0};
+    ants.ants[1].tours = {{-1, 0, -1}};
+    ants.ants[1].tour_lengths = {90.0};
+    ants.ants[1].current_quantity = {0.0};
+    ants.ants[1].current_time = {0.0};
+    ants.ants[1].visited = {true, false};
+    ants.ants[1].begin_service = {0.0, 1.0, 2.0};
+    ants.ants[1].to_visit = 1;
+    inout.iteration = 3;
+
+    acs_km::update_statistics(instance, ants, inout);
+    expect(ants.best_so_far_ant.total_tour_length == 90.0, "Expected best-so-far updated from better ant");
+    expect(inout.found_best == 3, "Expected found_best recorded from current iteration");
+}
+
 }  // namespace
 
 int main() {
@@ -159,6 +194,7 @@ int main() {
         test_shortest_tour_and_calc_dist_and_compare();
         test_relocation_and_exchange_helpers();
         test_pheromone_trail_update_orchestration();
+        test_init_try_and_update_statistics();
         std::cout << "All vrptw_acs core tests passed\n";
         return EXIT_SUCCESS;
     } catch (const std::exception& ex) {

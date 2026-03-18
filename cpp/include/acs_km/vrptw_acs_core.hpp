@@ -2,6 +2,7 @@
 
 #include "acs_km/ants_state.hpp"
 #include "acs_km/ants_core.hpp"
+#include "acs_km/inout.hpp"
 #include "acs_km/problem.hpp"
 #include "acs_km/utilities_core.hpp"
 
@@ -26,6 +27,8 @@ void generate_initial_weights(AntAlgorithmState& ants, UtilitiesCore& random_sou
 void as_update(AntAlgorithmState& ants);
 void acs_global_update(AntAlgorithmState& ants);
 void pheromone_trail_update(AntAlgorithmState& ants, int customer_count);
+void init_try(const InstanceData& instance, AntAlgorithmState& ants, InOutState& inout);
+void update_statistics(const InstanceData& instance, AntAlgorithmState& ants, InOutState& inout);
 [[nodiscard]] bool check_feasible_tour_relocation_multiple(const AntSolution& ant,
                                                            const InstanceData& vrp,
                                                            int index_tour_source,

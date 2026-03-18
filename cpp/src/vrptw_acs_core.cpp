@@ -141,6 +141,54 @@ void pheromone_trail_update(AntAlgorithmState& ants, const int customer_count) {
     }
 }
 
+void init_try(const InstanceData& instance, AntAlgorithmState& ants, InOutState& inout) {
+    inout.n_tours = 1;
+    inout.iteration = 1;
+    ants.best_so_far_ant.total_tour_length = std::numeric_limits<double>::max();
+    ants.restart_best_ant.total_tour_length = std::numeric_limits<double>::max();
+    inout.found_best = 0;
+    inout.lambda = 0.05;
+
+    if (!ants.acs_flag) {
+        const auto nn = nn_tour(ants, instance);
+        if (nn > 0.0 && ants.rho > 0.0) {
+            ants.trail_0 = 1.0 / (ants.rho * nn);
+        } else {
+            ants.trail_0 = 1.0;
+        }
+        init_pheromone_trails(ants, static_cast<int>(instance.customer_count()), ants.trail_0);
+    } else {
+        const auto no_available_nodes = static_cast<int>(instance.available_request_ids.size());
+        if (no_available_nodes == 0) {
+            ants.trail_0 = 1.0;
+        } else {
+            const auto nn = nn_tour(ants, instance);
+            if (nn > 0.0) {
+                ants.trail_0 = 1.0 / (static_cast<double>(no_available_nodes + 1) * nn);
+            } else {
+                ants.trail_0 = 1.0;
+            }
+        }
+        init_pheromone_trails(ants, static_cast<int>(instance.customer_count()), ants.trail_0);
+    }
+}
+
+void update_statistics(const InstanceData& instance, AntAlgorithmState& ants, InOutState& inout) {
+    const auto iteration_best_ant = find_best(ants.ants);
+    if (iteration_best_ant < 0 || static_cast<std::size_t>(iteration_best_ant) >= ants.ants.size()) {
+        return;
+    }
+    const auto& candidate = ants.ants[static_cast<std::size_t>(iteration_best_ant)];
+    if (is_better_solution(candidate, ants.best_so_far_ant)) {
+        copy_from_to(candidate, ants.best_so_far_ant, instance);
+        inout.found_best = inout.iteration;
+    }
+    if (is_better_solution(candidate, ants.restart_best_ant)) {
+        copy_from_to(candidate, ants.restart_best_ant, instance);
+        inout.restart_found_best = inout.iteration;
+    }
+}
+
 bool check_feasible_tour_relocation_multiple(const AntSolution& ant,
                                              const InstanceData& vrp,
                                              const int index_tour_source,

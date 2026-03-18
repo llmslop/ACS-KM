@@ -21,6 +21,12 @@ struct InOutState {
     int no_evaluations{0};
     int no_solutions{0};
     int found_best{0};
+    int restart_found_best{0};
+    int n_tours{0};
+    int iteration{0};
+    double time_used{0.0};
+    double time_passed{0.0};
+    double lambda{0.05};
 };
 
 void set_default_as_parameters(AntAlgorithmState& ants);
