@@ -14,9 +14,13 @@ struct Point {
 
 struct Problem {
     std::string name;
+    int n_near{};
     int vehicle_count{};
     int capacity{};
     std::vector<Point> nodes;
+    std::vector<std::vector<double>> distance;
+    std::vector<std::vector<int>> nn_list;
+    std::vector<std::vector<int>> nn_list_all;
 };
 
 struct InstanceData {

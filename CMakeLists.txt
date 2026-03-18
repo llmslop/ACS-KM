@@ -9,6 +9,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_library(acs_km_core
     cpp/src/data_reader.cpp
     cpp/src/km_match.cpp
+    cpp/src/vrptw_utils.cpp
 )
 
 target_include_directories(acs_km_core PUBLIC cpp/include)
@@ -39,4 +40,8 @@ if (BUILD_TESTING)
   add_executable(acs_km_km_match_test cpp/tests/test_km_match.cpp)
   target_link_libraries(acs_km_km_match_test PRIVATE acs_km_core)
   add_test(NAME acs_km_km_match_test COMMAND acs_km_km_match_test)
+
+  add_executable(acs_km_vrptw_utils_test cpp/tests/test_vrptw_utils.cpp)
+  target_link_libraries(acs_km_vrptw_utils_test PRIVATE acs_km_core)
+  add_test(NAME acs_km_vrptw_utils_test COMMAND acs_km_vrptw_utils_test)
 endif()
