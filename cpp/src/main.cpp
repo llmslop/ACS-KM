@@ -11,10 +11,16 @@ namespace {
 
 struct CliOptions {
     std::filesystem::path input_path{std::filesystem::path("input") / "rc203-0.5.txt"};
+    bool show_help{false};
     bool simulate_slices{false};
     double working_day_seconds{100.0};
     int time_slices{50};
 };
+
+std::string usage_message() {
+    return "Usage: acs_km_cli [--input /absolute/or/relative/path/to/file.txt] [--simulate-slices] "
+           "[--working-day positive_seconds] [--time-slices positive_count] [--help|-h]";
+}
 
 double parse_positive_double(const std::string& value, const std::string& option_name) {
     try {
@@ -47,6 +53,10 @@ CliOptions parse_options(int argc, char** argv) {
 
     for (int index = 1; index < argc; ++index) {
         const std::string arg = argv[index];
+        if (arg == "--help" || arg == "-h") {
+            options.show_help = true;
+            continue;
+        }
         if (arg == "--input") {
             if (index + 1 >= argc) {
                 throw std::runtime_error("Missing value for --input");
@@ -73,9 +83,7 @@ CliOptions parse_options(int argc, char** argv) {
             continue;
         }
 
-        throw std::runtime_error(
-            "Usage: acs_km_cli [--input /absolute/or/relative/path/to/file.txt] [--simulate-slices] "
-            "[--working-day positive_seconds] [--time-slices positive_count]");
+        throw std::runtime_error(usage_message());
     }
 
     return options;
@@ -89,6 +97,10 @@ int main(int argc, char** argv) {
         timer.start();
 
         const auto options = parse_options(argc, argv);
+        if (options.show_help) {
+            std::cout << usage_message() << '\n';
+            return 0;
+        }
         const acs_km::DataReader reader(options.input_path);
         const auto data = reader.read();
 

@@ -23,6 +23,13 @@ target_link_libraries(acs_km_cli PRIVATE acs_km_core)
 
 include(CTest)
 if (BUILD_TESTING)
+  add_test(NAME acs_km_cli_help_test COMMAND acs_km_cli --help)
+  set_tests_properties(acs_km_cli_help_test PROPERTIES
+    PASS_REGULAR_EXPRESSION "Usage: acs_km_cli")
+
+  add_test(NAME acs_km_cli_usage_error_test COMMAND acs_km_cli --unexpected-option)
+  set_tests_properties(acs_km_cli_usage_error_test PROPERTIES WILL_FAIL TRUE)
+
   add_executable(acs_km_data_reader_test cpp/tests/test_data_reader.cpp)
   target_link_libraries(acs_km_data_reader_test PRIVATE acs_km_core)
   target_compile_definitions(acs_km_data_reader_test PRIVATE ACS_KM_SOURCE_DIR="${CMAKE_SOURCE_DIR}")
